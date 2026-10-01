@@ -46,7 +46,7 @@ ${attachments.length ? `ATTACHMENTS: open each file with read_storage_file (file
 
 Return ONLY one JSON object (no code fences, no prose outside it):
 {"reply": "...", "summary": "...", "ops": [...], "question": null}
-- reply: 1 to 3 short sentences to N8 saying what you changed (or your answer). Plain words, feet and inches like 3'-0". No em dashes.
+- reply: 1 to 3 short sentences to N8 saying what you changed (or your answer). Plain words, feet and inches like 3'-0\\" (escape the inch mark inside JSON). No em dashes. Top of the plan (small y) is the front/north of the sheet; say "the wall with the sink" or name the room rather than a compass direction you are unsure of.
 - summary: a 3 to 7 word label for this version, like "Sink moved to island". Empty string if ops is empty.
 - question: only when a wrong guess would waste real work: {"text": "...", "options": ["short answer", "..."]} with 2 to 4 options, and ops [] or the safe part only. Otherwise choose the most reasonable reading, do it, and say what you chose.
 
@@ -79,7 +79,7 @@ N8: ${text}`
 
 /** Pull the first JSON object out of a model reply. */
 export function parseAnswer(raw: string): AgentAnswer {
-  const s = raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '')
+  const s = repairQuotes(raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, ''))
   let obj: any = null
   const start = s.indexOf('{')
   if (start >= 0) {
@@ -99,9 +99,14 @@ export function parseAnswer(raw: string): AgentAnswer {
       else if (ch === '}') {
         depth--
         if (depth === 0) {
+          const text = s.slice(start, i + 1)
           try {
-            obj = JSON.parse(s.slice(start, i + 1))
-          } catch {}
+            obj = JSON.parse(text)
+          } catch {
+            try {
+              obj = JSON.parse(repairQuotes(text))
+            } catch {}
+          }
           break
         }
       }
@@ -115,6 +120,50 @@ export function parseAnswer(raw: string): AgentAnswer {
     ops: Array.isArray(obj.ops) ? obj.ops.filter((o: any) => o && typeof o.op === 'string') : [],
     question: q ? { text: String(q.text), options: (Array.isArray(q.options) ? q.options : []).map(String).slice(0, 4) } : null,
   }
+}
+
+/**
+ * Models sometimes write inch marks (6'-0") unescaped inside JSON strings. Treat a quote inside a
+ * string as closing only when the next non-space character could follow a string value.
+ */
+export function repairQuotes(text: string): string {
+  let out = ''
+  let inStr = false
+  let esc = false
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (!inStr) {
+      if (ch === '"') inStr = true
+      out += ch
+      continue
+    }
+    if (esc) {
+      esc = false
+      out += ch
+      continue
+    }
+    if (ch === '\\') {
+      esc = true
+      out += ch
+      continue
+    }
+    if (ch === '"') {
+      let j = i + 1
+      while (j < text.length && /\s/.test(text[j])) j++
+      const next = text[j]
+      if (next === undefined || next === ',' || next === '}' || next === ']' || next === ':') {
+        inStr = false
+        out += ch
+      } else out += '\\"'
+      continue
+    }
+    if (ch === '\n') {
+      out += '\\n'
+      continue
+    }
+    out += ch
+  }
+  return out
 }
 
 export async function askVelda(sdk: ToolbeltSDK, prompt: string, modelName: string): Promise<AgentAnswer> {
