@@ -1,0 +1,1 @@
+import{Lt as e,j as t}from"./three.core-Dbc_D4oM.js";function n(n=0){let r=new t;r.userData.placeholder=!0,r.setAttribute(`position`,new e(new Float32Array(9),3)),r.setAttribute(`normal`,new e(new Float32Array(9),3)),r.setAttribute(`uv`,new e(new Float32Array(6),2)),r.setAttribute(`uv2`,new e(new Float32Array(6),2));for(let e=0;e<n;e++)r.addGroup(0,0,e);return r}export{n as t};

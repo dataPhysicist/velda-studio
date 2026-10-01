@@ -1,0 +1,1 @@
+import{K as e,q as t,z as n}from"./dist-BPEXqU1l.js";var r=.08;function i(e,t,r){return n(e,t,r)}function a(n,i,a){let o=e(n,i.minX,i.minZ,i.maxX,i.maxZ),s=t({moving:o,candidates:a,threshold:r});return{dx:s.snap?.dx??0,dz:s.snap?.dz??0,guides:s.guides}}export{a as n,i as t};

@@ -1,0 +1,1 @@
+var e=.003,t=.06;function n(e,t){return e===`half-round`?t:e===`box`?t/2:t*.4}function r(e){return(e??`k-style`)===`half-round`?`round`:`rect`}function i(e,t){let n=Math.max(.01,t/2);return e===`round`?{shape:e,halfX:n,halfZ:n}:{shape:e,halfX:n,halfZ:n*.7}}export{n as a,r as i,e as n,i as r,t};

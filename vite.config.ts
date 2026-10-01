@@ -1,0 +1,61 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import tailwindcss from '@tailwindcss/vite'
+import react from '@vitejs/plugin-react'
+import { defineConfig, type Plugin } from 'vite'
+
+const pkg = JSON.parse(readFileSync('./package.json', 'utf8'))
+
+// Two build targets:
+//  - default: assets resolve relative to the page (local dev / preview; ./assets is the public dir)
+//  - STUDIO_CDN=1: code and assets are served by jsDelivr from this repo at the tag v<version>.
+//    The Toolbelt page is a tiny index.html that loads dist/studio.js from there.
+const REPO = process.env.STUDIO_REPO ?? 'dataPhysicist/velda-studio'
+const cdn = process.env.STUDIO_CDN === '1'
+const ASSET_BASE = cdn ? `https://cdn.jsdelivr.net/gh/${REPO}@v${pkg.version}/assets` : '.'
+
+// Pascal references its static assets with root-absolute paths ("/icons/wall.webp").
+// The app is not served from a domain root, so point those at ASSET_BASE instead.
+const assetPaths: Plugin = {
+  name: 'studio-asset-paths',
+  enforce: 'pre',
+  transform(code, id) {
+    const file = id.split('?')[0]
+    if (!/@pascal-app|src\/host/.test(file) || !/\.(tsx?|jsx?)$/.test(file)) return null
+    const out = code.replace(/(['"`])\/(icons|audios)\//g, `$1${ASSET_BASE}/$2/`)
+    return out === code ? null : { code: out, map: null }
+  },
+}
+
+export default defineConfig({
+  base: './',
+  publicDir: cdn ? false : 'assets',
+  plugins: [assetPaths, react(), tailwindcss()],
+  resolve: {
+    alias: {
+      'next/image': path.resolve('shims/image.tsx'),
+      'next/link': path.resolve('shims/link.tsx'),
+      '@': path.resolve('src/host'),
+    },
+    dedupe: ['react', 'react-dom', 'three', 'zustand', '@react-three/fiber', '@react-three/drei'],
+  },
+  define: {
+    'process.env.NODE_ENV': '"production"',
+    'process.env.NEXT_PUBLIC_ASSETS_CDN_URL': JSON.stringify(ASSET_BASE),
+    'process.env': '{}',
+    __STUDIO_ASSET_BASE__: JSON.stringify(ASSET_BASE),
+    __STUDIO_VERSION__: JSON.stringify(pkg.version),
+  },
+  build: {
+    target: 'esnext',
+    chunkSizeWarningLimit: 30000,
+    reportCompressedSize: false,
+    rollupOptions: {
+      output: {
+        entryFileNames: 'studio.js',
+        chunkFileNames: 'chunks/[name]-[hash].js',
+        assetFileNames: (a) => (a.names?.some((n) => n.endsWith('.css')) ? 'studio.css' : 'chunks/[name]-[hash][extname]'),
+      },
+    },
+  },
+})

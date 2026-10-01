@@ -1,0 +1,1 @@
+var e=0,t=()=>{e+=1;let t=!1;return()=>{t||(t=!0,--e)}},n=()=>e>0;export{t as n,n as t};
