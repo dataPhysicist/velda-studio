@@ -5,7 +5,7 @@ import { sid } from '../lib/model'
 import { DuckRepo, MemoryRepo, type Repo } from '../repo'
 import { useViewer } from '@pascal-app/viewer'
 import { connect } from '../toolbelt'
-import { focusOn, openScheme, useStudio } from './store'
+import { focusOn, openScheme, send, useStudio } from './store'
 
 declare const __STUDIO_ASSET_BASE__: string
 
@@ -14,7 +14,7 @@ export async function boot() {
   const sdk = await connect()
   const repo: Repo = sdk ? new DuckRepo(sdk) : new MemoryRepo()
   set({ sdk, repo, status: sdk ? 'Connecting to your workspace' : 'Opening a local preview' })
-  ;(window as any).__studio = { sdk, repo, store: useStudio, focusOn, viewer: useViewer }
+  ;(window as any).__studio = { sdk, repo, store: useStudio, focusOn, send, viewer: useViewer }
   try {
     await repo.init()
     let schemes = await repo.schemes()

@@ -132,24 +132,29 @@ export class ToolbeltSDK {
     throw new Error('Velda did not answer')
   }
 
+  /**
+   * From a dashboard page, create_sub_chat returns a pending delegation and the delegation tools
+   * are not exposed. Find the sub-chat by the correlation id in its title and read its answer.
+   */
   private async waitForDelegation(correlationId: string, timeoutSeconds: number): Promise<string> {
-    // The delegation's own status can lag behind the answer, so also read the callee chat directly.
     const t0 = Date.now()
+    const short = correlationId.replace(/^dlg_/, '').slice(0, 8)
     let chatId: string | null = null
-    while (Date.now() - t0 < (timeoutSeconds + 60) * 1000) {
-      await new Promise((ok) => setTimeout(ok, 1500))
-      const st = await this.runToolParsed('manage_delegations', { action: 'status', correlationId }).catch(() => null)
-      if (st?.responseContent) return String(st.responseContent)
-      if (st?.status === 'failed' || st?.status === 'cancelled') throw new Error(st.errorMessage || st.progressNote || 'Velda stopped before answering')
-      chatId = st?.calleeChatId ?? chatId
-      if (chatId) {
-        const chat = await this.runToolParsed('toolbelt', {
-          action: 'get_chat',
-          params: JSON.stringify({ chatId, assistantId: this.workspaceId }),
-        }).catch(() => null)
-        const msgs: any[] = Array.isArray(chat?.messages) ? chat.messages : []
-        const last = msgs[msgs.length - 1]
-        if (last?.role === 'assistant' && typeof last.content === 'string' && last.content.trim() && !chat?.isProcessing) return last.content
+    while (Date.now() - t0 < (timeoutSeconds + 30) * 1000) {
+      await new Promise((ok) => setTimeout(ok, chatId ? 1200 : 1500))
+      if (!chatId) {
+        const found = await this.runToolParsed('toolbelt_search_chats', { assistantId: this.workspaceId, query: short }).catch(() => null)
+        chatId = found?.results?.find((r: any) => String(r.chatTitle || '').includes(short))?.chatId ?? null
+        if (!chatId) continue
+      }
+      const chat = await this.runToolParsed('toolbelt_get_chat', { chatId, assistantId: this.workspaceId }).catch(() => null)
+      if (!chat || chat.isProcessing) continue
+      const msgs: any[] = Array.isArray(chat.messages) ? chat.messages : []
+      const last = [...msgs].reverse().find((m) => m.role === 'assistant' && typeof m.content === 'string' && m.content.trim())
+      if (last && msgs[msgs.length - 1]?.role === 'assistant') {
+        // Each answer is a hidden event chat in Velda; remove it once read.
+        void this.runToolParsed('toolbelt_delete_chat', { chatId, assistantId: this.workspaceId }).catch(() => null)
+        return last.content
       }
     }
     throw new Error('Velda took too long to answer')
