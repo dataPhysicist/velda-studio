@@ -1,1 +1,0 @@
-import{Xo as e,wt as t}from"./dist-BPEXqU1l.js";function n(e,n){let r=t.getState().nodes[e];if(!r||r.type!==`window`&&r.type!==`door`)return;let{isNew:i,isTransient:a,...o}=r.metadata;t.getState().updateNode(e,{...n,metadata:o})}var r=({eventWallId:e,eventWallHidden:t,ownWallIds:n})=>t&&!n.includes(e),i=t=>e.nodes.get(t)?.userData?.wallHidden===!0;export{r as n,n as r,i as t};

@@ -52,11 +52,13 @@ export default defineConfig({
     target: 'esnext',
     chunkSizeWarningLimit: 30000,
     reportCompressedSize: false,
+    // One code file on purpose. jsDelivr fetches each file of a GitHub ref on first request, and a
+    // cold release split into ~290 chunks loads slowly and intermittently fails; one file does not.
     rollupOptions: {
       output: {
+        inlineDynamicImports: true,
         entryFileNames: 'studio.js',
-        chunkFileNames: 'chunks/[name]-[hash].js',
-        assetFileNames: (a) => (a.names?.some((n) => n.endsWith('.css')) ? 'studio.css' : 'chunks/[name]-[hash][extname]'),
+        assetFileNames: (a) => (a.names?.some((n) => n.endsWith('.css')) ? 'studio.css' : 'files/[name]-[hash][extname]'),
       },
     },
   },

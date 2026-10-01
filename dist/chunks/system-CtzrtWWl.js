@@ -1,1 +1,0 @@
-import{L as e}from"./dist-Drxg_C9J.js";import{t}from"./jsx-runtime-BdxMnOeJ.js";var n=t(),r=()=>(0,n.jsx)(e,{});export{r as default};

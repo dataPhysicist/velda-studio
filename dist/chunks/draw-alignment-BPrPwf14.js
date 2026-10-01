@@ -1,1 +1,0 @@
-import{Ln as e,jn as t}from"./src-DgcKkbc7.js";function n(n,r){if(r.bypass)return e.getState().clear(),n;let[i,a]=t([n[0],n[2]],{applySnap:r.applySnap});return[i,n[1],a]}function r(){e.getState().clear()}export{r as n,n as t};

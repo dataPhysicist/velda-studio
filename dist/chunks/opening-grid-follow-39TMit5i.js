@@ -1,1 +1,0 @@
-function e(e){return e.pointerType===`xr`&&e.hasActiveHost?!1:e.eventTime!==e.lastHostEventTime}function t(e){if(!e||typeof e!=`object`)return!0;let t=e;return t.inputSource==null&&t.pointerState?.inputSource==null||t.openingHoverBridge===!0}export{t as n,e as t};

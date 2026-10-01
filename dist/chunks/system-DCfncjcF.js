@@ -1,1 +1,0 @@
-import{I as e,N as t}from"./dist-Drxg_C9J.js";import{t as n}from"./jsx-runtime-BdxMnOeJ.js";var r=n(),i=()=>(0,r.jsxs)(r.Fragment,{children:[(0,r.jsx)(e,{}),(0,r.jsx)(t,{})]});export{i as default};

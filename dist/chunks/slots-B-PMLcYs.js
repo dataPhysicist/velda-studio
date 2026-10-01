@@ -1,1 +1,0 @@
-function e(e){return e.toLowerCase().startsWith(`slot_`)}function t(t){if(!e(t))return null;let n=t.slice(5);return n=n.replace(/\.\d+$/,``),n.toLowerCase()}function n(e){let t=e.replace(/_/g,` `).trim();return t&&t.charAt(0).toUpperCase()+t.slice(1)}export{e as n,n as r,t};
