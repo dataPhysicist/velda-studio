@@ -6,18 +6,20 @@ Built on the MIT-licensed [Pascal editor](https://github.com/pascalorg/editor) (
 
 ## How it is deployed
 
-Toolbelt storage holds one small file, `toolbelt/index.html`. It loads the built code (`dist/`) and the static assets (`assets/`) from this repository through jsDelivr, pinned to a version tag:
+Toolbelt storage holds one small file, `toolbelt/index.html`. It loads the built code (`dist/`) and the static assets (`assets/`) from this repository through jsDelivr, pinned to commit SHAs so every release is immutable:
 
-    https://cdn.jsdelivr.net/gh/dataPhysicist/velda-studio@v<version>/dist/studio.js
+    https://cdn.jsdelivr.net/gh/dataPhysicist/velda-studio@<commit>/dist/studio.js
 
 Inside Toolbelt the scene is saved to the workspace DuckDB file `velda_studio.duckdb` (table `projects`) through the dashboard bridge. Outside Toolbelt the editor falls back to browser storage.
 
 ## Release
 
-1. Bump `version` in `package.json`.
-2. `npm install && npm run build:cdn` (writes `dist/` with asset URLs pinned to the new tag).
-3. Commit `dist/`, tag `v<version>`, push with tags.
-4. Update the two jsDelivr URLs in `toolbelt/index.html` and copy that file to `apps/velda-studio/index.html` in Toolbelt storage.
+1. `npm install`
+2. `STUDIO_ASSET_REF=<sha of a commit that contains the current assets/> npm run build:cdn`
+3. Commit `dist/` and push. Note the new commit SHA.
+4. Put that SHA in the two jsDelivr URLs in `toolbelt/index.html`, commit, and copy the file to `apps/velda-studio/index.html` in Toolbelt storage.
+
+`assets/` only needs a new ref when its contents change.
 
 ## Local development
 

@@ -8,11 +8,13 @@ const pkg = JSON.parse(readFileSync('./package.json', 'utf8'))
 
 // Two build targets:
 //  - default: assets resolve relative to the page (local dev / preview; ./assets is the public dir)
-//  - STUDIO_CDN=1: code and assets are served by jsDelivr from this repo at the tag v<version>.
-//    The Toolbelt page is a tiny index.html that loads dist/studio.js from there.
+//  - STUDIO_CDN=1: code and assets are served by jsDelivr from this repo.
+//    Assets are pinned to STUDIO_ASSET_REF: a commit SHA (or tag) that contains ./assets.
+//    The Toolbelt page is a tiny index.html that loads dist/studio.js at the commit that contains the build.
 const REPO = process.env.STUDIO_REPO ?? 'dataPhysicist/velda-studio'
 const cdn = process.env.STUDIO_CDN === '1'
-const ASSET_BASE = cdn ? `https://cdn.jsdelivr.net/gh/${REPO}@v${pkg.version}/assets` : '.'
+const ASSET_REF = process.env.STUDIO_ASSET_REF ?? `v${pkg.version}`
+const ASSET_BASE = cdn ? `https://cdn.jsdelivr.net/gh/${REPO}@${ASSET_REF}/assets` : '.'
 
 // Pascal references its static assets with root-absolute paths ("/icons/wall.webp").
 // The app is not served from a domain root, so point those at ASSET_BASE instead.
