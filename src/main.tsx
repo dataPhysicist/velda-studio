@@ -1,6 +1,6 @@
 import './globals.css'
 import { loadPlugin } from '@pascal-app/core'
-import { Editor, ItemsPanel } from '@pascal-app/editor'
+import { Editor, ItemsPanel, useScene } from '@pascal-app/editor'
 import { builtinPlugin } from '@pascal-app/nodes'
 import { Hammer, Layers, Package, Settings } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -38,6 +38,9 @@ function App() {
       await loadPlugin(builtinPlugin)
       const sdk = await connect()
       if (sdk) await ensureSchema(sdk).catch((e) => console.error('[studio] schema setup failed', e))
+      // Small handle for diagnostics and for agent-driven edits.
+      ;(window as any).__studio = { version: __STUDIO_VERSION__, bridge: !!sdk, project: PROJECT_ID, sdk, useScene, saves: 0, lastSaveError: null }
+      console.info(`[studio] v${__STUDIO_VERSION__} bridge=${sdk ? 'toolbelt' : 'none (browser storage)'} project=${PROJECT_ID}`)
       if (alive) setBoot({ sdk })
     })().catch((e) => console.error('[studio] boot failed', e))
     return () => {
@@ -51,7 +54,18 @@ function App() {
     if (!sdk) return {}
     return {
       onLoad: () => loadScene(sdk, PROJECT_ID),
-      onSave: (scene: unknown) => saveScene(sdk, PROJECT_ID, PROJECT_ID, scene),
+      onSave: async (scene: unknown) => {
+        const st = (window as any).__studio
+        try {
+          await saveScene(sdk, PROJECT_ID, PROJECT_ID, scene)
+          st.saves++
+          st.lastSaveError = null
+        } catch (e) {
+          st.lastSaveError = String(e)
+          console.error('[studio] save failed', e)
+          throw e
+        }
+      },
     }
   }, [boot])
 

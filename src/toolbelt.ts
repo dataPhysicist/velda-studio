@@ -72,14 +72,20 @@ export class ToolbeltSDK {
 export const DB = 'velda_studio.duckdb'
 const lit = (v: string) => `'${v.replace(/'/g, "''")}'`
 
-/** Resolves to a connected SDK inside Toolbelt, or null when there is no bridge. */
-export async function connect(timeoutMs = 4000): Promise<ToolbeltSDK | null> {
-  if (window.parent === window) return null
+/**
+ * Resolves to a connected SDK inside Toolbelt, or null when there is no bridge.
+ * Iframed (in-app): the parent window answers. Top-level (preview or public URL): Toolbelt's
+ * injected shim intercepts window.postMessage. With no bridge at all nothing answers, so time out.
+ */
+export async function connect(timeoutMs = window.parent === window ? 2500 : 6000): Promise<ToolbeltSDK | null> {
   const sdk = new ToolbeltSDK()
   const timeout = new Promise<null>((ok) => setTimeout(() => ok(null), timeoutMs))
   const ready = sdk.init().then(
     () => sdk,
-    () => null,
+    (e) => {
+      console.warn('[studio] Toolbelt bridge init failed', e)
+      return null
+    },
   )
   return Promise.race([ready, timeout])
 }
