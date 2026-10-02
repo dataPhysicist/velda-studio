@@ -23,8 +23,8 @@ Model: ${model}
 Input (JSON): ${JSON.stringify(input)}
 ${opts.note ? `Notes: ${opts.note}\n` : ''}
 Steps:
-1. If you are not sure of the model's input field names, read its schema with the Replicate get-model tool and map the input above onto the real field names (keep the values; image lists stay lists).
-2. Create the prediction, then check it with the get-prediction tool until its status is succeeded, failed or canceled. Wait between checks.
+1. Read the model with the Replicate get-model tool (collectionSlug = the owner, modelId = "${model}"). Take latest_version.id as the version. If a field name in the input above does not exist in its schema, map it onto the real field (keep the values; image lists stay lists).
+2. Create the prediction with the create-prediction tool (collectionSlug = the owner, modelId = "${model}", version = that id, input = the JSON as a string), then check it with the get-prediction tool until its status is succeeded, failed or canceled. Wait between checks.
 3. Reply with ONLY one JSON object and nothing else:
 {"status": "succeeded" or "failed", "output": <the prediction's output exactly as returned, URLs unchanged>, "error": <error text or null>}`
   const raw = await sdk.ask(prompt, 'claude-sonnet-4-6', opts.timeoutSeconds ?? 300)

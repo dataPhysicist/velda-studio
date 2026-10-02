@@ -83,13 +83,15 @@ async function captureRoom(a: Op) {
   const id = sid('cap')
   activity(`Measuring the ${room.name.toLowerCase()} from ${media.length} photos`)
   const urls = await Promise.all(media.slice(0, 24).map(link))
-  const res = await runReplicate(sdk, MODELS.reconstruct, { images: urls }, {
-    timeoutSeconds: 420,
-    note: 'The images are frames of one indoor room. If the model takes a single video or zip instead of a list, choose the list/images field. Prefer outputs that include a colored point cloud (PLY or GLB) and camera poses.',
+  // Schema checked 2026-10-02: field `inputs` (image URLs), output {point_cloud: GLB, mesh: GLB, data: [JSON per frame]}.
+  const res = await runReplicate(sdk, MODELS.reconstruct, { inputs: urls, return_pcd: true, return_mesh: false }, {
+    timeoutSeconds: 600, // cold starts take about 3 to 4 minutes
+    note: 'The images are frames of one indoor room. Use these exact field names.',
   })
   activity('Reading the 3D points')
   let cloud = null as Awaited<ReturnType<typeof parseCloud>> | null
-  for (const u of outputUrls(res.output)) {
+  const pc = res.output && typeof res.output === 'object' && typeof res.output.point_cloud === 'string' ? [res.output.point_cloud] : []
+  for (const u of pc.length ? pc : outputUrls(res.output)) {
     if (/\.(json|txt|npz|npy|png|jpg|jpeg|mp4)(\?|$)/i.test(u)) continue
     try {
       const buf = await (await fetch(u)).arrayBuffer()
@@ -240,9 +242,10 @@ async function make3d(a: Op) {
   const image = String(a.image ?? it.props?.image ?? '')
   if (!image) throw new Error('there is no product photo to model from')
   activity(`Building a 3D model of the ${it.label.toLowerCase()}`)
-  const res = await runReplicate(sdk, MODELS.to3d, { image: await link(image) }, {
+  // Default face_count (500k) makes ~35 MB GLBs; 60k keeps furniture crisp at a few MB.
+  const res = await runReplicate(sdk, MODELS.to3d, { image: await link(image), face_count: 60000, generate_type: 'Normal' }, {
     timeoutSeconds: 480,
-    note: 'Single product photo; we need a textured GLB mesh. Use default quality settings.',
+    note: 'Single product photo; we need a textured GLB mesh. Use these exact field names.',
   })
   const url = outputUrls(res.output).find((u) => /\.glb(\?|$)/i.test(u)) ?? outputUrls(res.output)[0]
   if (!url) throw new Error('no 3D file came back')
