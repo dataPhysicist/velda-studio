@@ -5,7 +5,7 @@ import { sid } from '../lib/model'
 import { DuckRepo, MemoryRepo, type Repo } from '../repo'
 import { useViewer } from '@pascal-app/viewer'
 import { connect } from '../toolbelt'
-import { focusOn, openScheme, send, useStudio } from './store'
+import { focusOn, openScheme, rerender, send, useStudio } from './store'
 
 declare const __STUDIO_ASSET_BASE__: string
 
@@ -14,7 +14,17 @@ export async function boot() {
   const sdk = await connect()
   const repo: Repo = sdk ? new DuckRepo(sdk) : new MemoryRepo()
   set({ sdk, repo, status: sdk ? 'Connecting to your workspace' : 'Opening a local preview' })
-  ;(window as any).__studio = { sdk, repo, store: useStudio, focusOn, send, viewer: useViewer }
+  ;(window as any).__studio = {
+    sdk,
+    repo,
+    store: useStudio,
+    focusOn,
+    send,
+    rerender,
+    viewer: useViewer,
+    // For checks from the console: capture math, actions and snapshots.
+    lib: () => Promise.all([import('../lib/capture'), import('./actions'), import('./ViewerExtras')]).then(([capture, actions, extras]) => ({ capture, actions, extras })),
+  }
   try {
     await repo.init()
     let schemes = await repo.schemes()
@@ -34,6 +44,7 @@ export async function boot() {
     const last = await repo.setting('last_scheme')
     const first = schemes.find((s) => s.id === last) ?? schemes.find((s) => s.id === 'n8-kitchen') ?? schemes[0]
     await openScheme(first.id)
+    void import('./actions').then((m) => m.loadCaptures()).catch((e) => console.warn('[studio] captures not loaded', e))
   } catch (e) {
     console.error('[studio] boot failed', e)
     set({ status: null, error: `Velda Studio could not start: ${(e as Error).message || e}` })

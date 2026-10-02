@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { finishFor, ROLES, swatches, type Theme } from '../lib/theme'
 import type { Attachment, Message } from '../repo'
 import { Stage } from './Stage'
-import { focusOn, goToVersion, isDeep, newSchemeFromCurrent, openScheme, send, stepVersion, uploadAttachment, useStudio } from './store'
+import { enterWalk, exitWalk, focusOn, goToVersion, isDeep, newSchemeFromCurrent, openScheme, send, stepVersion, uploadAttachment, uploadVideo, useStudio } from './store'
 
 declare const __STUDIO_ASSET_BASE__: string
 
@@ -35,10 +35,14 @@ export function App() {
         <Stage />
         <TitleBlock />
         <div className="stage-foot">
-          <ViewSwitch />
+          <div className="foot-left">
+            <ViewSwitch />
+            <CaptureToggle />
+          </div>
           <ThemeStrip />
         </div>
         <Versions />
+        <WalkHud />
         {(status || error || !model) && (
           <div className="stage-veil" role="status">
             <p className={error ? 'veil-error' : ''}>{error ?? status ?? 'Loading'}</p>
@@ -98,18 +102,25 @@ function TitleBlock() {
       </div>
       <h1 className="room-title">{room?.name ?? (levelId ? model?.levels.find((l) => l.id === levelId)?.name : 'Whole house')}</h1>
       <nav className="levels" aria-label="Level">
-        <button type="button" aria-pressed={!levelId && !roomId} onClick={() => focusOn({ levelId: null, roomId: null })}>
+        <button
+          type="button"
+          aria-pressed={!levelId && !roomId}
+          onClick={() => {
+            exitWalk()
+            focusOn({ levelId: null, roomId: null })
+          }}
+        >
           Whole house
         </button>
         {model?.levels.map((l) => (
-          <button key={l.id} type="button" aria-pressed={levelId === l.id && !roomId} onClick={() => focusOn({ levelId: l.id, roomId: null })}>
+          <button key={l.id} type="button" aria-pressed={levelId === l.id && !roomId} onClick={() => goTo({ levelId: l.id, roomId: null })}>
             {l.name}
           </button>
         ))}
       </nav>
       <nav className="rooms" aria-label="Room">
         {rooms.map((r) => (
-          <button key={r.id} type="button" aria-pressed={roomId === r.id} onClick={() => focusOn({ roomId: roomId === r.id ? null : r.id })}>
+          <button key={r.id} type="button" aria-pressed={roomId === r.id} onClick={() => goTo({ roomId: roomId === r.id && !useStudio.getState().walk ? null : r.id })}>
             {r.name}
           </button>
         ))}
@@ -118,15 +129,73 @@ function TitleBlock() {
   )
 }
 
+/** Room and level picks: in walkthrough they move you there; otherwise they frame the view. */
+function goTo(opts: { levelId?: string | null; roomId?: string | null }) {
+  focusOn(opts)
+  if (useStudio.getState().walk) enterWalk()
+}
+
 function ViewSwitch() {
   const view = useStudio((s) => s.view)
+  const walking = useStudio((s) => !!s.walk)
   return (
     <div className="view-switch" role="group" aria-label="View">
-      <button type="button" aria-pressed={view === '3d'} onClick={() => focusOn({ view: '3d' })}>
+      <button
+        type="button"
+        aria-pressed={!walking && view === '3d'}
+        onClick={() => {
+          exitWalk()
+          focusOn({ view: '3d' })
+        }}
+      >
         3D
       </button>
-      <button type="button" aria-pressed={view === 'plan'} onClick={() => focusOn({ view: 'plan' })}>
+      <button
+        type="button"
+        aria-pressed={!walking && view === 'plan'}
+        onClick={() => {
+          exitWalk()
+          focusOn({ view: 'plan' })
+        }}
+      >
         Plan
+      </button>
+      <button type="button" aria-pressed={walking} onClick={() => (walking ? exitWalk() : enterWalk())}>
+        Walk through
+      </button>
+    </div>
+  )
+}
+
+function CaptureToggle() {
+  const has = useStudio((s) => s.clouds.length > 0)
+  const show = useStudio((s) => s.showCaptures)
+  if (!has) return null
+  return (
+    <button type="button" className="toggle" aria-pressed={show} onClick={() => useStudio.setState({ showCaptures: !show })}>
+      {show ? 'Hide captured room' : 'Show captured room'}
+    </button>
+  )
+}
+
+function WalkHud() {
+  const walking = useStudio((s) => !!s.walk)
+  const [seen, setSeen] = useState(false)
+  useEffect(() => {
+    if (!walking) return
+    setSeen(false)
+    const t = setTimeout(() => setSeen(true), 7000)
+    return () => clearTimeout(t)
+  }, [walking])
+  if (!walking) return null
+  return (
+    <div className={`walk-hud${seen ? ' is-quiet' : ''}`} role="status">
+      <p>
+        Move with <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or the arrow keys, and drag to look around. Hold <kbd>Shift</kbd> to go faster. Double-click to steer with the mouse alone. Pick a room
+        above to step into it.
+      </p>
+      <button type="button" className="link" onClick={exitWalk}>
+        Leave walkthrough (Esc)
       </button>
     </div>
   )
@@ -251,7 +320,7 @@ type ComposerApi = { add: (files: File[]) => void }
 
 const STARTERS = [
   'Move the sink to the island',
-  'Cream perimeter cabinets with a walnut island',
+  'Show this room realistically',
   'Add a 6 foot arched opening to the deck',
   'What would you change in this room?',
 ]
@@ -259,10 +328,11 @@ const STARTERS = [
 function Conversation({ composerRef }: { composerRef: React.RefObject<ComposerApi | null> }) {
   const messages = useStudio((s) => s.messages)
   const thinking = useStudio((s) => s.thinking)
+  const activity = useStudio((s) => s.activity)
   const end = useRef<HTMLDivElement>(null)
   useEffect(() => {
     end.current?.scrollIntoView({ block: 'end' })
-  }, [messages.length, thinking])
+  }, [messages.length, thinking, activity])
   const last = messages[messages.length - 1]
   return (
     <aside className="talk" aria-label="Conversation with Velda">
@@ -272,6 +342,7 @@ function Conversation({ composerRef }: { composerRef: React.RefObject<ComposerAp
           <Bubble key={m.id} m={m} live={m === last && !thinking} />
         ))}
         {thinking && <Thinking />}
+        {!thinking && activity && <Activity />}
         <div ref={end} />
       </div>
       <Composer ref={composerRef} />
@@ -282,8 +353,19 @@ function Conversation({ composerRef }: { composerRef: React.RefObject<ComposerAp
 function Welcome() {
   return (
     <div className="welcome">
-      <p className="welcome-lead">Describe a change, or add a photo you like.</p>
-      <p className="muted">Velda updates the model and keeps every version, so you can always go back.</p>
+      <p className="welcome-lead">Describe a change, or show Velda what you mean.</p>
+      <ul className="welcome-ways">
+        <li>
+          <strong>Paste or drop images</strong> of rooms, finishes or furniture you like. Velda turns them into a look for the room.
+        </li>
+        <li>
+          <strong>Paste a link</strong> to a sofa, vanity, light or tile. Velda reads its size and builds it in the space as a 3D model.
+        </li>
+        <li>
+          <strong>Add photos or a short video</strong> of a room as it is today, slowly walking it. Velda measures it, rebuilds it in the model, and can show your own photo remodeled.
+        </li>
+      </ul>
+      <p className="muted small">Every change is saved as a version, so you can always step back.</p>
       <div className="chips">
         {STARTERS.map((s) => (
           <button key={s} type="button" onClick={() => send(s)}>
@@ -299,14 +381,21 @@ function Bubble({ m, live }: { m: Message; live: boolean }) {
   const versions = useStudio((s) => s.versions)
   const headId = useStudio((s) => s.headId)
   const v = m.version_id ? versions.find((x) => x.id === m.version_id) : null
+  const before = m.attachments?.find((a) => a.role === 'before')
+  const after = m.attachments?.find((a) => a.role === 'after')
+  const compare = after ? ([before ?? after, after] as const) : null
   return (
-    <div className={`bubble ${m.role}`}>
-      {!!m.attachments?.length && (
-        <div className="att-row">
-          {m.attachments.map((a) => (
-            <AttachmentThumb key={a.path} a={a} />
-          ))}
-        </div>
+    <div className={`bubble ${m.role}${compare ? ' has-compare' : ''}`}>
+      {compare ? (
+        <Compare before={compare[0]} after={compare[1]} />
+      ) : (
+        !!m.attachments?.length && (
+          <div className="att-row">
+            {m.attachments.map((a) => (
+              <AttachmentThumb key={a.path} a={a} />
+            ))}
+          </div>
+        )
       )}
       <div className="bubble-body">{renderText(m.body)}</div>
       {v && (
@@ -317,7 +406,7 @@ function Bubble({ m, live }: { m: Message; live: boolean }) {
       {live && !!m.chips?.length && (
         <div className="chips">
           {m.chips.map((c) => (
-            <button key={c} type="button" onClick={() => send(c)}>
+            <button key={c} type="button" onClick={() => (/^walk through/i.test(c) ? enterWalk() : send(c))}>
               {c}
             </button>
           ))}
@@ -334,6 +423,82 @@ function AttachmentThumb({ a }: { a: Attachment }) {
     if (!src && /^image\//.test(a.type) && sdk) sdk.readImage(a.path).then(setSrc).catch(() => {})
   }, [a.path])
   return src ? <img className="att" src={src} alt={a.name} /> : <span className="att doc">{(a.name.split('.').pop() || 'file').slice(0, 4)}</span>
+}
+
+function useImage(a: Attachment | undefined) {
+  const sdk = useStudio((s) => s.sdk)
+  const [src, setSrc] = useState<string | null>(a?.preview ?? null)
+  useEffect(() => {
+    if (!a || src) return
+    if (/^https?:/.test(a.path)) setSrc(a.path)
+    else if (sdk) sdk.readImage(a.path).then(setSrc).catch(() => {})
+  }, [a?.path, sdk])
+  return src
+}
+
+/** Drag across to reveal the render over the original. */
+function Compare({ before, after }: { before: Attachment; after: Attachment }) {
+  const a = useImage(before)
+  const b = useImage(after)
+  const [x, setX] = useState(55)
+  const box = useRef<HTMLDivElement>(null)
+  const move = (clientX: number) => {
+    const r = box.current?.getBoundingClientRect()
+    if (r) setX(Math.max(0, Math.min(100, ((clientX - r.left) / r.width) * 100)))
+  }
+  const same = before === after
+  return (
+    <div
+      ref={box}
+      className="compare"
+      onPointerMove={(e) => e.buttons && move(e.clientX)}
+      onPointerDown={(e) => move(e.clientX)}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowLeft') setX((v) => Math.max(0, v - 5))
+        if (e.key === 'ArrowRight') setX((v) => Math.min(100, v + 5))
+      }}
+      tabIndex={0}
+      role="slider"
+      aria-label="Compare before and after"
+      aria-valuenow={Math.round(x)}
+    >
+      {b ? <img src={b} alt="Realistic render" /> : <span className="img-ph" />}
+      {!same && a && (
+        <div className="compare-before" style={{ clipPath: `inset(0 ${100 - x}% 0 0)` }}>
+          <img src={a} alt={before.name} />
+        </div>
+      )}
+      {!same && <span className="compare-bar" style={{ left: `${x}%` }} />}
+      {!same && <span className="compare-tag left">{before.name}</span>}
+      <span className="compare-tag right">{same ? after.name : 'New design'}</span>
+      {b && (
+        <a className="compare-open" href={b} target="_blank" rel="noreferrer" download="velda-render.jpg">
+          Open full size
+        </a>
+      )}
+    </div>
+  )
+}
+
+function Activity() {
+  const activity = useStudio((s) => s.activity)!
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const secs = Math.round((now - activity.started) / 1000)
+  return (
+    <div className="bubble assistant thinking" role="status">
+      <span className="dots" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      {activity.text}
+      {secs > 3 ? ` (${secs < 90 ? `${secs}s` : `${Math.floor(secs / 60)} min`})` : ''}
+    </div>
+  )
 }
 
 function Thinking() {
@@ -387,6 +552,10 @@ const Composer = ({ ref }: { ref: React.RefObject<ComposerApi | null> }) => {
 
   const add = (files: File[]) => {
     for (const f of files) {
+      if (/^video\//.test(f.type)) {
+        addVideo(f)
+        continue
+      }
       if (f.size > 25e6) continue
       const key = `${f.name}-${f.size}-${Math.random()}`
       const preview = /^image\//.test(f.type) ? URL.createObjectURL(f) : undefined
@@ -395,6 +564,18 @@ const Composer = ({ ref }: { ref: React.RefObject<ComposerApi | null> }) => {
         .then((att) => setAtts((a) => a.map((x) => (x.key === key ? { ...att, key, preview: preview ?? att.preview } : x))))
         .catch(() => setAtts((a) => a.filter((x) => x.key !== key)))
     }
+  }
+  const addVideo = (f: File) => {
+    const key = `${f.name}-${f.size}-${Math.random()}`
+    setAtts((a) => [...a, { key, path: '', name: `${f.name}: reading frames`, type: 'video', uploading: true }])
+    uploadVideo(f, (name) => setAtts((a) => a.map((x) => (x.key === key ? { ...x, name } : x))))
+      .then((frames) =>
+        setAtts((a) => [...a.filter((x) => x.key !== key), ...frames.map((fr, i) => ({ ...fr, key: `${key}-${i}` }))]),
+      )
+      .catch((e) => {
+        setAtts((a) => a.filter((x) => x.key !== key))
+        window.alert(`That video could not be read: ${(e as Error).message}`)
+      })
   }
   if (ref) (ref as any).current = { add }
 
@@ -440,7 +621,7 @@ const Composer = ({ ref }: { ref: React.RefObject<ComposerApi | null> }) => {
         ref={input}
         rows={1}
         value={text}
-        placeholder="Describe a change…"
+        placeholder="Describe a change, paste a photo, or paste a product link…"
         onChange={(e) => setText(e.target.value)}
         onPaste={(e) => {
           const files = [...e.clipboardData.files]
@@ -458,12 +639,12 @@ const Composer = ({ ref }: { ref: React.RefObject<ComposerApi | null> }) => {
       />
       <div className="composer-row">
         <button type="button" className="link" onClick={() => file.current?.click()}>
-          Add photos
+          Add photos or video
         </button>
         <input
           ref={file}
           type="file"
-          accept="image/*,application/pdf"
+          accept="image/*,video/*,application/pdf"
           multiple
           hidden
           onChange={(e) => {

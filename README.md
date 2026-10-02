@@ -13,13 +13,21 @@ Built on the MIT-licensed [Pascal editor](https://github.com/pascalorg/editor) p
 - **First run** (`src/lib/import.ts`): each Velda 3D scheme is imported with its plan walls (`apps/velda-3d/data/geo_*.json`, merged into clean wall lines by `src/lib/plan-walls.ts`, which also finds room outlines from the room labels), fixtures and themes. The Designs Unlimited color plan direction (7.6.26) is seeded as two themes, with its inspiration images in `assets/themes/`.
 - **Textures**: Pascal 1.0.3's material library points at `*_512.ktx2` files, but many bundled textures are JPG or WebP. `scripts/material-remap.json` (built by `scripts/material-remap.mjs`) points each missing file at the one that exists; `src/main.tsx` applies it at startup.
 
+- **Walkthrough** (`src/app/Walk.tsx`): first person at 5'-3" eye height; W A S D or arrows, drag to look, Shift to hurry, double-click for mouse look; collision against the model's walls with doors and openings cut out, and against fixtures.
+- **Products**: paste a link or a product photo; Velda reads the size and image, places the item, then `make_3d` turns the photo into a textured GLB (Replicate `tencent/hunyuan-3d-3.1`), stored in DuckDB `blobs`/`blob_parts` and loaded as a blob URL.
+- **Room capture** (`src/lib/capture.ts`, `src/app/actions.ts`): photos or a phone video (16 sharpest frames are pulled in the browser) go to MapAnything (Replicate `vufinder/map-anything`, Apache weights) for a metric point cloud. The page finds the floor, the wall directions and the wall-to-wall size, draws a top-down plan, lines the points up with the plan and shows them in place. Then Velda follows AWSM's observe, build, verify loop: it reads the photos and the measured plan, edits the room to match, looks at the rebuilt room from inside next to the photos, and fixes what is still off (one revision).
+- **Realistic renders**: `render` paints the design into one of N8's photos (holding his camera) or renders the current 3D view, with Replicate `google/nano-banana-2`, shown as a before/after slider.
+- Replicate jobs run through a Velda sub-chat (`src/lib/replicate.ts`), since Velda has the Replicate service and reads each model's schema itself.
+
 Outside Toolbelt the page opens a local preview from `scripts/fixtures/` in memory.
 
 ## Deployment
 
-Toolbelt storage holds one small file, `apps/velda-studio/index.html` (copy of `toolbelt/index.html`). It loads the built code from this repository through jsDelivr, pinned to commit SHAs:
+Toolbelt storage holds one small file, `apps/velda-studio/index.html` (copy of `toolbelt/index.html`). It reads `release.json` from this repository's `main` branch (raw.githubusercontent.com) to learn the current build commit, then loads that commit's `dist/` through jsDelivr:
 
     https://cdn.jsdelivr.net/gh/dataPhysicist/velda-studio@<commit>/dist/studio.js
+
+If GitHub cannot be reached within 2.5 s it loads the `FALLBACK` commit written into the page. So a release is a push; the Toolbelt file only needs updating to move the fallback.
 
 ## Release
 
@@ -27,8 +35,9 @@ Toolbelt storage holds one small file, `apps/velda-studio/index.html` (copy of `
 2. If `assets/` changed, commit and push it first and note that commit's SHA.
 3. `rm -rf dist && STUDIO_ASSET_REF=<sha of a commit that contains the current assets/> npm run build:cdn`
 4. Commit `dist/` and push. Note the new commit SHA.
-5. Put that SHA in the two jsDelivr URLs in `toolbelt/index.html`, commit, and copy the file to `apps/velda-studio/index.html` in Toolbelt storage.
+5. Write that SHA to `release.json` (and the `FALLBACK` in `toolbelt/index.html`), commit and push. `scripts/release.sh <asset-sha> "<message>"` does steps 3 to 5.
 6. Open both jsDelivr URLs once so the CDN caches them before anyone loads the page.
+7. Occasionally copy `toolbelt/index.html` to `apps/velda-studio/index.html` in Toolbelt storage to move the fallback.
 
 ## Local development
 

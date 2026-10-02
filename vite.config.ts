@@ -29,10 +29,21 @@ const assetPaths: Plugin = {
   },
 }
 
+// Generated 3D models load from blob: URLs; Pascal's resolver would prefix them with the asset base.
+const blobUrls: Plugin = {
+  name: 'studio-blob-urls',
+  enforce: 'pre',
+  transform(code, id) {
+    if (!/viewer\/dist\/lib\/asset-url\.js$/.test(id.split('?')[0])) return null
+    const out = code.replaceAll("url.startsWith('http://') || url.startsWith('https://')", "url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')")
+    return out === code ? null : { code: out, map: null }
+  },
+}
+
 export default defineConfig({
   base: './',
   publicDir: cdn ? false : 'assets',
-  plugins: [assetPaths, react(), tailwindcss()],
+  plugins: [assetPaths, blobUrls, react(), tailwindcss()],
   resolve: {
     alias: {
       'next/image': path.resolve('shims/image.tsx'),

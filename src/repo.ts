@@ -7,7 +7,7 @@ import { DB, lit, type ToolbeltSDK } from './toolbelt'
 
 export type Scheme = { id: string; name: string; head_version: string | null; sort: number; created_at?: string }
 export type Version = { id: string; scheme_id: string; seq: number; summary: string; source: string; created_at?: string }
-export type Attachment = { path: string; name: string; type: string; preview?: string }
+export type Attachment = { path: string; name: string; type: string; preview?: string; role?: 'before' | 'after' }
 export type Message = {
   id: string
   scheme_id: string
@@ -34,6 +34,40 @@ export interface Repo {
   saveTheme(t: Theme): Promise<void>
   setting(key: string): Promise<string | null>
   setSetting(key: string, value: string): Promise<void>
+  saveBlob(b: BlobMeta, bytes: Uint8Array): Promise<void>
+  blobMeta(id: string): Promise<BlobMeta | null>
+  blobBytes(id: string): Promise<Uint8Array | null>
+  captures(): Promise<Capture[]>
+  saveCapture(c: Capture): Promise<void>
+}
+
+/** Binary assets kept in DuckDB (generated 3D models, captured point clouds), base64 in 512 KB parts. */
+export type BlobMeta = { id: string; kind: 'glb' | 'points'; name: string; size: number; meta: Record<string, unknown> }
+/** A room captured from photos or video: where its point cloud sits in the plan and what was measured. */
+export type Capture = {
+  id: string
+  room_id: string
+  level: string
+  name: string
+  status: string
+  media: string[] // storage paths of the frames used
+  blob_id: string | null // point cloud
+  analysis: Record<string, unknown> | null
+  transform: number[] | null // 4x4 column-major, capture meters -> model meters
+  created_at?: string
+}
+
+const CHUNK = 512 * 1024
+export function toB64(bytes: Uint8Array) {
+  let s = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return btoa(s)
+}
+export function fromB64(b64: string) {
+  const bin = atob(b64)
+  const out = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
+  return out
 }
 
 const json = (v: unknown) => lit(JSON.stringify(v ?? null))
@@ -63,6 +97,56 @@ export class DuckRepo implements Repo {
     )
     await this.q(`CREATE TABLE IF NOT EXISTS themes (id VARCHAR PRIMARY KEY, name VARCHAR, data VARCHAR, updated_at TIMESTAMP DEFAULT now())`)
     await this.q(`CREATE TABLE IF NOT EXISTS settings (key VARCHAR PRIMARY KEY, value VARCHAR)`)
+    await this.q(`CREATE TABLE IF NOT EXISTS blobs (id VARCHAR PRIMARY KEY, kind VARCHAR, name VARCHAR, size BIGINT, parts INTEGER, meta VARCHAR, created_at TIMESTAMP DEFAULT now())`)
+    await this.q(`CREATE TABLE IF NOT EXISTS blob_parts (blob_id VARCHAR, seq INTEGER, data VARCHAR)`)
+    await this.q(
+      `CREATE TABLE IF NOT EXISTS captures (id VARCHAR PRIMARY KEY, room_id VARCHAR, level VARCHAR, name VARCHAR, status VARCHAR, media VARCHAR, blob_id VARCHAR, analysis VARCHAR, transform VARCHAR, created_at TIMESTAMP DEFAULT now())`,
+    )
+  }
+  async saveBlob(b: BlobMeta, bytes: Uint8Array) {
+    await this.q(`DELETE FROM blob_parts WHERE blob_id = ${lit(b.id)}`)
+    const parts = Math.ceil(bytes.length / CHUNK)
+    for (let i = 0; i < parts; i++) {
+      await this.q(`INSERT INTO blob_parts (blob_id, seq, data) VALUES (${lit(b.id)}, ${i}, '${toB64(bytes.subarray(i * CHUNK, (i + 1) * CHUNK))}')`)
+    }
+    await this.q(
+      `INSERT INTO blobs (id, kind, name, size, parts, meta) VALUES (${lit(b.id)}, ${lit(b.kind)}, ${lit(b.name)}, ${bytes.length}, ${parts}, ${json(b.meta)})
+       ON CONFLICT (id) DO UPDATE SET kind = excluded.kind, name = excluded.name, size = excluded.size, parts = excluded.parts, meta = excluded.meta`,
+    )
+  }
+  async blobMeta(id: string) {
+    const rows = await this.q(`SELECT id, kind, name, size, meta FROM blobs WHERE id = ${lit(id)}`)
+    return rows.length ? ({ ...rows[0], size: Number(rows[0].size), meta: parse(rows[0].meta, {}) } as BlobMeta) : null
+  }
+  async blobBytes(id: string) {
+    const head = await this.q(`SELECT parts, size FROM blobs WHERE id = ${lit(id)}`)
+    if (!head.length) return null
+    const parts = Number(head[0].parts)
+    const out = new Uint8Array(Number(head[0].size))
+    let off = 0
+    for (let i = 0; i < parts; i++) {
+      const rows = await this.q(`SELECT data FROM blob_parts WHERE blob_id = ${lit(id)} AND seq = ${i}`)
+      if (!rows.length) return null
+      const b = fromB64(rows[0].data)
+      out.set(b, off)
+      off += b.length
+    }
+    return out
+  }
+  async captures() {
+    const rows = await this.q(
+      `SELECT id, room_id, level, name, status, media, blob_id, analysis, transform, CAST(created_at AS VARCHAR) created_at FROM captures ORDER BY created_at`,
+    )
+    return rows.map((r) => ({ ...r, media: parse(r.media, []), analysis: parse(r.analysis, null), transform: parse(r.transform, null) })) as Capture[]
+  }
+  async saveCapture(c: Capture) {
+    await this.q(
+      `INSERT INTO captures (id, room_id, level, name, status, media, blob_id, analysis, transform) VALUES (${lit(c.id)}, ${lit(c.room_id)}, ${lit(c.level)}, ${lit(c.name)}, ${lit(
+        c.status,
+      )}, ${json(c.media)}, ${lit(c.blob_id)}, ${json(c.analysis)}, ${json(c.transform)})
+       ON CONFLICT (id) DO UPDATE SET room_id = excluded.room_id, level = excluded.level, name = excluded.name, status = excluded.status, media = excluded.media,
+         blob_id = excluded.blob_id, analysis = excluded.analysis, transform = excluded.transform`,
+    )
   }
   async schemes() {
     const rows = await this.q(`SELECT id, name, head_version, sort, CAST(created_at AS VARCHAR) created_at FROM schemes ORDER BY sort, created_at`)
@@ -168,5 +252,22 @@ export class MemoryRepo implements Repo {
   }
   async setSetting(key: string, value: string) {
     this.kv.set(key, value)
+  }
+  private blobs = new Map<string, { meta: BlobMeta; bytes: Uint8Array }>()
+  private caps: Capture[] = []
+  async saveBlob(b: BlobMeta, bytes: Uint8Array) {
+    this.blobs.set(b.id, { meta: b, bytes })
+  }
+  async blobMeta(id: string) {
+    return this.blobs.get(id)?.meta ?? null
+  }
+  async blobBytes(id: string) {
+    return this.blobs.get(id)?.bytes ?? null
+  }
+  async captures() {
+    return this.caps
+  }
+  async saveCapture(c: Capture) {
+    this.caps = [...this.caps.filter((x) => x.id !== c.id), { ...c, created_at: c.created_at ?? new Date().toISOString() }]
   }
 }

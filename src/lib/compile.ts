@@ -7,6 +7,7 @@ import {
   CabinetNode,
   DoorNode,
   ItemNode,
+  CeilingNode,
   LevelNode,
   SiteNode,
   SlabNode,
@@ -25,6 +26,9 @@ export type CompiledScene = {
   rootNodeIds: string[]
   materials: Record<string, AnyNode>
 }
+
+/** Generated 3D models loaded from storage: blob id -> object URL plus measured bounds (asset units). */
+export const assetRegistry: Record<string, { url: string; size: [number, number, number]; offset: [number, number, number] }> = {}
 
 const CATALOG: Record<string, any> = Object.fromEntries((catalog as any[]).map((c) => [c.id, c]))
 const P = (x: number, y: number): [number, number] => [x * IN, y * IN]
@@ -129,6 +133,21 @@ export function compileScene(model: StudioModel): CompiledScene {
     )
   }
 
+  // Ceilings: seen only from inside (single-sided), so they never block the cut-away view.
+  for (const r of model.rooms) {
+    add(
+      CeilingNode.parse({
+        id: `ceiling_${r.id}`,
+        name: `${r.name} ceiling`,
+        polygon: r.polygon.map(([x, y]) => P(x, y)),
+        height: model.ceiling * IN,
+        children: [],
+        metadata: { sid: r.id },
+      }),
+      levelOf(r.level),
+    )
+  }
+
   // Walls with their doors and windows.
   for (const w of model.walls) {
     const lv = levelOf(w.level)
@@ -193,6 +212,8 @@ export function compileScene(model: StudioModel): CompiledScene {
             openingKind: o.kind === 'opening' ? 'opening' : 'door',
             openingShape: o.shape === 'arch' ? 'arch' : 'rectangle',
             ...(o.style === 'french' || (o.style !== 'pocket' && o.w >= 60) ? { leafCount: 2 } : {}),
+            // Doors stand open so the house reads (and walks) as connected rooms.
+            operationState: o.style === 'sliding' || o.style === 'pocket' ? 0.85 : 0.75,
             metadata: { sid: o.id, wall: w.id },
           }),
           wall,
@@ -361,6 +382,33 @@ export function compileScene(model: StudioModel): CompiledScene {
           ...(it.kind === 'beam' ? { supportOffset: (it.z ?? model.ceiling - it.h) * IN } : {}),
           children: [],
           slots: { interior: mat, exterior: mat },
+          metadata: { sid: it.id, label: it.label, kind: it.kind },
+        }),
+        lv,
+      )
+      return
+    }
+    const gen = typeof it.props?.asset === 'string' ? assetRegistry[it.props.asset as string] : undefined
+    if (gen) {
+      add(
+        ItemNode.parse({
+          id: `item_${it.id}`,
+          name: it.label,
+          position: [it.x * IN, (it.z ?? 0) * IN, it.y * IN],
+          rotation: [0, yaw, 0],
+          scale: [(it.w * IN) / gen.size[0], (it.h * IN) / gen.size[1], (it.d * IN) / gen.size[2]],
+          asset: {
+            id: `gen-${it.props!.asset}`,
+            category: 'furniture',
+            name: it.label,
+            thumbnail: '',
+            src: gen.url,
+            dimensions: gen.size,
+            offset: gen.offset,
+            rotation: [0, 0, 0],
+            scale: [1, 1, 1],
+          },
+          children: [],
           metadata: { sid: it.id, label: it.label, kind: it.kind },
         }),
         lv,

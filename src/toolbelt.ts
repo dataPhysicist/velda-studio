@@ -108,6 +108,12 @@ export class ToolbeltSDK {
     return fileName
   }
 
+  async signedUrl(fileName: string, expiresIn = 7200): Promise<string> {
+    const r = await this.runToolParsed('get_storage_file_url', { fileName, expiresIn })
+    if (!r?.url) throw new Error(`No link for ${fileName}`)
+    return r.url
+  }
+
   async readImage(fileName: string): Promise<string | null> {
     const r = await this.runTool('read_storage_file', { fileName })
     const part = Array.isArray(r?.content) ? r.content.find((p: any) => p?.type === 'image' && p.data) : null

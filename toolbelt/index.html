@@ -4,16 +4,38 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Velda Studio</title>
-<!-- Toolbelt app page. The app code is built from github.com/dataPhysicist/velda-studio and served by jsDelivr.
-     To release: see README. The two URLs below are pinned to the commit that contains the build. -->
+<!-- Toolbelt app page. The app is built from github.com/dataPhysicist/velda-studio and served by jsDelivr,
+     pinned to a commit. The page reads release.json from GitHub for the current commit, so a release is
+     just a push; if GitHub cannot be reached it uses the FALLBACK commit below. See README. -->
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif&display=swap">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/dataPhysicist/velda-studio@8eecbe54da1f1c0fec4f6e6489f009f150484b7f/dist/studio.css">
 <style>html,body,#root{margin:0;height:100%;background:#e9eae4}</style>
 </head>
 <body>
 <div id="root"></div>
-<script type="module" src="https://cdn.jsdelivr.net/gh/dataPhysicist/velda-studio@8eecbe54da1f1c0fec4f6e6489f009f150484b7f/dist/studio.js"></script>
+<script>
+(function () {
+  var FALLBACK = '0000000000000000000000000000000000000000'
+  var REPO = 'dataPhysicist/velda-studio'
+  function load(sha) {
+    var base = 'https://cdn.jsdelivr.net/gh/' + REPO + '@' + sha + '/dist/'
+    var css = document.createElement('link')
+    css.rel = 'stylesheet'
+    css.href = base + 'studio.css'
+    document.head.appendChild(css)
+    var js = document.createElement('script')
+    js.type = 'module'
+    js.src = base + 'studio.js'
+    document.body.appendChild(js)
+  }
+  var done = false
+  var timer = setTimeout(function () { if (!done) { done = true; load(FALLBACK) } }, 2500)
+  fetch('https://raw.githubusercontent.com/' + REPO + '/main/release.json', { cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : null })
+    .then(function (j) { if (!done) { done = true; clearTimeout(timer); load((j && /^[0-9a-f]{40}$/.test(j.sha)) ? j.sha : FALLBACK) } })
+    .catch(function () { if (!done) { done = true; clearTimeout(timer); load(FALLBACK) } })
+})()
+</script>
 </body>
 </html>

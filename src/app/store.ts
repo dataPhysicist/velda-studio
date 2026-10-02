@@ -8,7 +8,9 @@ import type { Theme } from '../lib/theme'
 import { IN } from '../lib/units'
 import type { Attachment, Message, Repo, Scheme, Version } from '../repo'
 import type { ToolbeltSDK } from '../toolbelt'
+import { useViewer } from '@pascal-app/viewer'
 import { type Focus, showScene } from './scene'
+import { walkStart } from './Walk'
 
 type State = {
   sdk: ToolbeltSDK | null
@@ -28,6 +30,11 @@ type State = {
   view: '3d' | 'plan'
   focus: Focus | null
   sceneKey: number
+  walk: { key: number; levelId: string; x: number; y: number; z: number; yaw: number } | null
+  exitWalk: () => void
+  activity: { text: string; started: number } | null // long jobs: capture, renders, 3D models
+  clouds: { id: string; level: string; pos: Float32Array; col: Uint8Array; transform: number[] }[]
+  showCaptures: boolean
 }
 
 export const useStudio = create<State>(() => ({
@@ -48,6 +55,11 @@ export const useStudio = create<State>(() => ({
   view: '3d',
   focus: null,
   sceneKey: 0,
+  walk: null,
+  exitWalk: () => exitWalk(),
+  activity: null,
+  clouds: [],
+  showCaptures: true,
 }))
 
 const set = useStudio.setState
@@ -58,6 +70,13 @@ const get = useStudio.getState
 function render(model: StudioModel) {
   showScene(compileScene(model))
   set((s) => ({ model, sceneKey: s.sceneKey + 1 }))
+  void import('./actions').then((m) => m.loadAssets(model)).catch(() => {})
+}
+
+/** Recompile the current model (after generated 3D models finish loading). */
+export function rerender() {
+  const m = get().model
+  if (m) showScene(compileScene(m))
 }
 
 export function computeFocus(): Focus | null {
@@ -83,6 +102,22 @@ export function computeFocus(): Focus | null {
     box: [b.x0 * IN, elev * IN, b.y0 * IN, b.x1 * IN, (lv ? elev + 36 : top * 0.5) * IN, b.y1 * IN],
     view,
   }
+}
+
+export function enterWalk() {
+  const { model, roomId, levelId } = get()
+  if (!model) return
+  const start = walkStart(model, roomId, levelId)
+  set({ walk: { key: Date.now(), ...start }, levelId: start.levelId })
+  const v = useViewer.getState()
+  v.setLevelMode('solo')
+  v.setSelection({ levelId: `level_${start.levelId}` as any, selectedIds: [] })
+}
+
+export function exitWalk() {
+  if (!get().walk) return
+  set({ walk: null })
+  set({ focus: computeFocus() })
 }
 
 export function focusOn(opts: { levelId?: string | null; roomId?: string | null; view?: '3d' | 'plan' }) {
@@ -127,7 +162,7 @@ export async function openScheme(id: string) {
   }
 }
 
-async function commitVersion(model: StudioModel, summary: string, source: string): Promise<Version> {
+export async function commitVersion(model: StudioModel, summary: string, source: string): Promise<Version> {
   const { repo, schemeId, versions, schemes } = get()
   if (!repo || !schemeId) throw new Error('No scheme open')
   const v: Version = { id: sid('v'), scheme_id: schemeId, seq: (versions[versions.length - 1]?.seq ?? 0) + 1, summary, source }
@@ -176,7 +211,7 @@ export async function newSchemeFromCurrent(name: string) {
 
 // ------------------------------------------------------------------ conversation
 
-async function addMessage(m: Omit<Message, 'id' | 'scheme_id'>) {
+export async function addMessage(m: Omit<Message, 'id' | 'scheme_id'>) {
   const { repo, schemeId } = get()
   if (!repo || !schemeId) return null
   const msg: Message = { id: sid('m'), scheme_id: schemeId, ...m, created_at: new Date().toISOString() }
@@ -195,6 +230,20 @@ export async function uploadAttachment(file: File): Promise<Attachment> {
   const path = `velda-studio/uploads/${schemeId ?? 'scheme'}/${Date.now().toString(36)}-${safe}.${ext}`
   if (sdk) await sdk.upload(path, await toBase64(blob), isImage ? 'image/jpeg' : file.type || 'application/octet-stream')
   return { path, name: file.name, type: isImage ? 'image/jpeg' : file.type || 'file', preview }
+}
+
+/** A video becomes about 16 sharp frames uploaded as photos (the video itself is too big to keep). */
+export async function uploadVideo(file: File, progress: (label: string) => void): Promise<Attachment[]> {
+  const { videoFrames } = await import('../lib/capture')
+  const frames = await videoFrames(file, 16, (k) => progress(`${file.name}: frame ${k} of 16`))
+  const out: Attachment[] = []
+  const base = file.name.replace(/\.[^.]+$/, '')
+  for (let i = 0; i < frames.length; i++) {
+    progress(`${file.name}: uploading ${i + 1} of ${frames.length}`)
+    const f = new File([frames[i]], `${base}-frame-${String(i + 1).padStart(2, '0')}.jpg`, { type: 'image/jpeg' })
+    out.push(await uploadAttachment(f))
+  }
+  return out
 }
 
 export async function send(text: string, attachments: Attachment[] = []) {
@@ -221,8 +270,10 @@ export async function send(text: string, attachments: Attachment[] = []) {
     const ans = await askVelda(sdk, prompt, modelName)
     let versionId: string | null = null
     let note = ''
-    if (ans.ops.length) {
-      const res = applyOps(get().model!, ans.ops)
+    const { splitOps, runActions } = await import('./actions')
+    const { model: modelOps, actions } = splitOps(ans.ops)
+    if (modelOps.length) {
+      const res = applyOps(get().model!, modelOps)
       if (res.applied) {
         const v = await commitVersion(res.model, ans.summary || 'Change from Velda', 'chat')
         versionId = v.id
@@ -244,10 +295,99 @@ export async function send(text: string, attachments: Attachment[] = []) {
       version_id: versionId,
       chips: ans.question?.options ?? [],
     })
+    if (actions.length) {
+      set({ thinking: null })
+      await runActions(actions)
+    }
   } catch (e) {
     await addMessage({ role: 'assistant', body: `Something went wrong reaching Velda: ${(e as Error).message}. Your model is unchanged.` })
   } finally {
     set({ thinking: null })
+  }
+}
+
+/**
+ * After a capture: Velda looks at the photos, the measured top-down plan and the model, and edits the
+ * room to match (observe and build); then it looks at the rebuilt room from inside and fixes what
+ * still differs (verify). After AWSM's observe, build, verify loop, with one revision.
+ */
+export async function observeAndBuild(opts: { capture: any; planPath: string; room: { id: string; name: string; level: string } }) {
+  const { sdk } = get()
+  const model = get().model
+  if (!sdk || !model) return
+  const an = opts.capture.analysis
+  const frames = (opts.capture.media as string[]).filter((_, i, arr) => arr.length <= 8 || i % Math.ceil(arr.length / 8) === 0).slice(0, 8)
+  const attachments: Attachment[] = [
+    { path: opts.planPath, name: 'Measured top-down plan of the capture', type: 'image/png' },
+    ...frames.map((p, i) => ({ path: p, name: `Photo ${i + 1} of the room`, type: 'image/jpeg' })),
+  ]
+  const text = `I just captured the ${opts.room.name} (room ${opts.room.id}) with photos. Measured from the 3D reconstruction: ${an.widthIn}" by ${an.depthIn}" wall to wall${
+    an.ceilingIn ? `, ceiling ${an.ceilingIn}"` : ''
+  }. The capture was lined up with the plan using a quarter turn of ${an.quarter} (its x axis along the plan's ${an.quarter % 2 ? 'y' : 'x'} axis).
+OBSERVE: look at every photo and the top-down plan. List to yourself the walls, door and window openings, and every fixture you see (vanity and sinks, tub, shower and glass, toilet, linen, mirrors), with sizes from the measurements and the photos.
+BUILD: return operations that make the ${opts.room.name} in the model match the room as it is today: move or resize its walls to the measured size, put openings where the photos show them, and add, move or resize fixtures. Use real sizes. Keep fixture ids when they are the same thing.
+If the photos show the capture is turned the wrong way against the plan (for example the window is on the wrong side), also return {"op":"capture_align","quarter":0|1|2|3}.
+In reply, tell N8 in two or three sentences what you measured and changed, and anything you could not see.`
+  const room = model.rooms.find((r) => r.id === opts.room.id)
+  set({ thinking: { model: DEEP_MODEL, started: Date.now() }, activity: null })
+  try {
+    const ans = await askVelda(sdk, buildPrompt({ model, text, attachments, history: [], focus: { roomId: room?.id ?? null, roomName: room?.name ?? null, level: room?.level ?? null } }), DEEP_MODEL)
+    const { splitOps, runActions } = await import('./actions')
+    const { model: modelOps, actions } = splitOps(ans.ops)
+    let versionId: string | null = null
+    if (modelOps.length) {
+      const res = applyOps(get().model!, modelOps)
+      if (res.applied) versionId = (await commitVersion(res.model, ans.summary || `${opts.room.name} as captured`, 'capture')).id
+    }
+    if (actions.length) await runActions(actions)
+    await addMessage({ role: 'assistant', body: ans.reply || `I measured the ${opts.room.name.toLowerCase()} and updated the model.`, version_id: versionId, chips: ['Show my photo remodeled with the theme', 'Walk through it'] })
+    if (versionId) await verifyCapture(opts, frames)
+  } finally {
+    set({ thinking: null })
+  }
+}
+
+async function verifyCapture(opts: { room: { id: string; name: string; level: string } }, frames: string[]) {
+  const { sdk, model } = get()
+  if (!sdk || !model) return
+  const { snapshotView } = await import('./ViewerExtras')
+  const { walkStart } = await import('./Walk')
+  set({ activity: { text: 'Checking the model against your photos', started: Date.now() } })
+  try {
+    // Two views from inside the room, looking down its length both ways.
+    const s = walkStart(model, opts.room.id, opts.room.level)
+    const views: Attachment[] = []
+    for (const [k, yaw] of [s.yaw, s.yaw + Math.PI].entries()) {
+      const q = [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)]
+      const blob = await snapshotView(1280, 960, { position: [s.x, s.y + 1.6, s.z], quaternion: q, fov: 70 })
+      const path = `velda-studio/captures/verify-${Date.now().toString(36)}-${k}.png`
+      const b64 = await new Promise<string>((ok) => {
+        const r = new FileReader()
+        r.onload = () => ok(String(r.result).split(',')[1] ?? '')
+        r.readAsDataURL(blob)
+      })
+      await sdk.upload(path, b64, 'image/png')
+      views.push({ path, name: `Model view ${k + 1} from inside the ${opts.room.name}`, type: 'image/png' })
+    }
+    const text = `VERIFY: the first ${views.length} images are views of the rebuilt ${opts.room.name} from inside the model; the rest are N8's photos of the real room. Compare them. If walls, openings or fixtures are clearly in the wrong place, the wrong size or missing, return operations that fix only those. If it matches well enough, return no operations. Reply in one sentence.`
+    const ans = await askVelda(
+      sdk,
+      buildPrompt({ model, text, attachments: [...views, ...frames.slice(0, 6).map((p, i) => ({ path: p, name: `Photo ${i + 1}`, type: 'image/jpeg' }))], history: [], focus: { roomId: opts.room.id, roomName: opts.room.name, level: opts.room.level } }),
+      DEEP_MODEL,
+    )
+    const { splitOps } = await import('./actions')
+    const { model: modelOps } = splitOps(ans.ops)
+    if (modelOps.length) {
+      const res = applyOps(get().model!, modelOps)
+      if (res.applied) {
+        const v = await commitVersion(res.model, ans.summary || `${opts.room.name} checked against photos`, 'verify')
+        await addMessage({ role: 'assistant', body: ans.reply || 'I compared the model with your photos and fixed what was off.', version_id: v.id })
+      }
+    }
+  } catch (e) {
+    console.warn('[studio] verify skipped', e)
+  } finally {
+    set({ activity: null })
   }
 }
 

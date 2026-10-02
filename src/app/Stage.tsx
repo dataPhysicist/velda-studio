@@ -5,6 +5,8 @@ import { useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import { Box3, Vector3 } from 'three'
 import { useStudio } from './store'
+import { WalkControls } from './Walk'
+import { CaptureLayer, Snapshotter } from './ViewerExtras'
 
 function Controls() {
   const ref = useRef<CameraControls>(null)
@@ -56,6 +58,7 @@ function Controls() {
 export function Stage() {
   const focus = useStudio((s) => s.focus)
   const sceneKey = useStudio((s) => s.sceneKey)
+  const walking = useStudio((s) => !!s.walk)
   useEffect(() => {
     const v = useViewer.getState()
     v.setWallMode('cutaway')
@@ -64,6 +67,7 @@ export function Stage() {
     v.setUnit('imperial')
   }, [])
   useEffect(() => {
+    if (useStudio.getState().walk) return
     const v = useViewer.getState()
     if (focus?.levelId) {
       v.setLevelMode('solo')
@@ -75,8 +79,10 @@ export function Stage() {
   }, [focus?.levelId])
   return (
     <div className="stage-canvas">
-      <Viewer selectionManager="custom" renderContext="viewer" sceneReadyKey={sceneKey}>
-        <Controls />
+      <Viewer selectionManager="custom" renderContext="viewer" sceneReadyKey={sceneKey} maxFps={walking ? 60 : 50}>
+        {walking ? <WalkControls /> : <Controls />}
+        <Snapshotter />
+        <CaptureLayer />
       </Viewer>
     </div>
   )

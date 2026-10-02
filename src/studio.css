@@ -129,3 +129,29 @@ button:disabled { cursor: default; }
 .composer-row { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
 .send { background: var(--verdigris); color: #fff; border: 0; border-radius: 8px; padding: 7px 18px; font-weight: 600; }
 .send:disabled { background: #a9b9b5; }
+
+/* Walkthrough */
+.walk-hud { position: absolute; left: 50%; bottom: 112px; transform: translateX(-50%); width: min(560px, 70%); background: rgba(251, 251, 248, 0.94);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; transition: opacity 0.6s ease; }
+.walk-hud p { margin: 0; font-size: 13px; color: var(--slate); }
+.walk-hud .link { white-space: nowrap; font-size: 13px; }
+.walk-hud.is-quiet { opacity: 0.35; }
+.walk-hud.is-quiet:hover { opacity: 1; }
+kbd { font: 600 11px var(--sans); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--paper); color: var(--graphite); }
+.stage-canvas canvas { outline: none; }
+
+.foot-left { display: flex; gap: 8px; align-items: center; }
+.toggle { border: 1px solid var(--line); background: var(--paper); border-radius: 8px; padding: 6px 12px; font-size: 13px; color: var(--slate); }
+.toggle[aria-pressed='true'] { color: var(--graphite); border-color: #b9d1ca; background: var(--verdigris-soft); }
+.welcome-ways { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 10px; font-size: 14px; color: var(--slate); }
+.welcome-ways strong { color: var(--graphite); font-weight: 600; }
+.bubble.has-compare { max-width: 100%; width: 100%; }
+.compare { position: relative; border-radius: 10px; overflow: hidden; cursor: ew-resize; user-select: none; margin-bottom: 8px; background: var(--plaster); touch-action: none; }
+.compare img { display: block; width: 100%; height: auto; pointer-events: none; }
+.compare-before { position: absolute; inset: 0; }
+.compare-before img { width: 100%; height: 100%; object-fit: cover; }
+.compare-bar { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.15); transform: translateX(-1px); pointer-events: none; }
+.compare-tag { position: absolute; top: 8px; font-size: 12px; background: rgba(35, 40, 44, 0.7); color: #fff; padding: 2px 8px; border-radius: 10px; pointer-events: none; }
+.compare-tag.left { left: 8px; }
+.compare-tag.right { right: 8px; }
+.compare-open { position: absolute; right: 8px; bottom: 8px; font-size: 12px; background: rgba(251, 251, 248, 0.92); color: var(--graphite); padding: 3px 9px; border-radius: 10px; text-decoration: none; }
