@@ -8,3 +8,7 @@ Used on 2026-10-04 with the as-built Level 2 sheet (A2, issue 7.2.26). The sheet
 4. `apply.py` writes the corrected walls (window widths to the nearest even inch, doors to the clear gap, existing door styles kept).
 
 Checked by eye before writing: four 3'-0" windows on the primary bedroom back wall, two on its side wall, three on the guest bedroom 3 / bath 3 wall, windows (not a door) on the primary bath outside wall, no windows on the far-left wall, a missing closet wall with a 2'-0" door by the guest bath. Window sills and heights are not on the plan (defaults 36" / 48").
+
+5. `missing.py` looks for drawn wall cores (white bands 2.5" to 8.5" wide between two lines, at least 12" long) that no model wall covers. It is noisy near cabinets and fixtures, so each hit was checked by eye. Added from it: the closet bottom wall along the hall, the guest bedroom 3 entry wall with its 32" door, the top of the guest bedroom 2 wall with its 28" door, and the closet wall with a 24" door.
+
+`level2-asbuilt-walls.json` is the final level 2 wall list written to versions `va2plan-asbuilt`, `va2plan-velda-bath` and `va2plan-n8-bath-blue` (59 walls, 14 windows, 14 doors, 2 cased openings).
