@@ -32,6 +32,18 @@ Where Playwright's Chromium download is blocked (this build sandbox), set `PW_CH
 - 2026-10-18 `npm run dev` was broken at the start (howler, a CommonJS sound library inside Pascal's editor, was not pre-bundled). Fixed with `optimizeDeps.include`.
 - 2026-10-18 Pascal's catalog items (toilet, bathtub GLBs) load from a Supabase storage host, not from this repo. Blocked in the build sandbox; works in the live page as far as is known. Noted as an outside dependency; Phase 4 checks whether to vendor the few we use.
 - 2026-10-18 Design direction for Phases 2 and 3 (frontend-design skill loaded, kept consistent with 06 section 10): keep the existing plaster, graphite and verdigris chrome; verdigris stays the one action and selection color, so it never collides with the provenance colors (measured ink, traced amber, assumed grey, set by Velda blue, conflict red). Instrument Sans for the interface with tabular figures; dimension strings in a condensed face at 11 px or more. No gradients on new panels, 1 px borders, words not icons outside the five-tool strip.
+- 2026-10-18 Model v2 additions beyond 04: `Wall.demolish` and `Item.demolish` (marked to be demolished on the sheet), `Opening.prov.swing`, `Note.locked` (structural cautions a person can acknowledge but not remove), room flags `needs_name` (an unnamed face) and `open_outline` (an explicit room the walls no longer close).
+- 2026-10-18 Moving a wall: corner neighbors keep their direction and stretch to the new line; walls tee'd into it follow; its own tee'd ends slide on their hosts. A straight continuation with nothing else at the joint gets a short connecting wall so the plan stays closed. The along-the-wall part of a `move` with dx and dy is not applied (walls move sideways only) and the reply says so.
+- 2026-10-18 Engineer notes: on delete of any wall that is not marked no-load, on moves over 6 in of such walls, and on new openings in exterior or load-bearing walls (not in walls of unknown bearing, so ordinary edits are not buried in notes).
+- 2026-10-18 Rooms: faces of the wall network (kind wall only; glass, half walls and rails do not split rooms), inset by half each wall's thickness. Faces joined only by a wall with a cased opening are one room when at most one side has a name (the guest bath 2 vanity alcove). Several names in one face: split by perpendicular bisectors. No name: "Room N" flagged for naming.
+- 2026-10-18 Healing before rooms and on migration: near-collinear pieces within 1.5 in put on one line; near-miss corners and tees within half the other wall plus 1.5 in closed; an already-joined end may be extended (never trimmed) so its partners tee into it.
+- 2026-10-18 Migration frame: both levels move by (3.1, 126) so v0.3 level 1 and level 2 stay aligned in the A2 sheet frame (the spec sentence about "the matching sheet offset for level 1" read as the same house translation; A1 was the v0.3 house frame with offset 0, 0).
+- 2026-10-18 Migration rooms: where the v0.3 walls close a room it is derived (primary bedroom 235.7 x 220.8 in against 19'-8" by 18'-5 1/2"; laundry 89.6 x 116.9 against 7'-6 3/4" by 9'-9 1/4"); where traced gaps merge rooms, the v0.3 outline is kept as an explicit room flagged open_outline until the sheet is imported (13 of 25 on the As-built). Exterior walls are marked load-bearing ('yes'), per 07 and 10; everything else 'unknown'.
+- 2026-10-18 Migrated ceilings (9'-6") are marked assumed, not measured, so the intake asks again (N8 now says 9 ft for A2).
+- 2026-10-18 Window `h` from Velda: values less than 24 in above the sill are read as glass height (the v0.3 meaning) and converted to head height, with a note in the result.
+- 2026-10-18 As-built guardrail implemented now (07 section 9), not in Phase 5, because it is an accuracy rule: Velda's design ops on the as-built scheme branch to a new scheme first; notes and field dimensions may land on as-built. Schemes gained a `role` column (asbuilt or proposed).
+- 2026-10-18 Room capture: kept compiling on v2, removed from the welcome text and from Velda's prompt; the code stays for the Experimental switch.
+- 2026-10-18 The test copy (`velda_studio_dev.duckdb`) was seeded from the live database's schemes, versions, themes and settings (read only on the live file; 5 schemes, 8 versions), so the dev page shows N8's real schemes and their migration runs on the copy. Live counts for later comparison: As-built head 108 walls, 51 openings, 25 rooms.
 
 ## 2026-10-18  Phase 0  commit eaa8f33 (dev release, build 5f119ff)
 
@@ -55,3 +67,26 @@ Open:
 Decisions N8 needs: none. Needs from N8: sign in to Toolbelt once in the Claude app's built-in browser.
 
 Next: Phase 1 (model v2 and migration) in parallel; when N8 has signed in, open the Velda Studio page, read `platform_checks`, record pass or fail per item here, and finish the manual checklist items that need the page.
+
+## 2026-10-18  Phase 1  commit f5fc9dc (dev release, build 9c4d3cc)
+
+Done:
+- `src/model/`: model v2 types with provenance on every number (`types.ts`), units, geometry, joints and rooms from walls (`derive.ts`), the ops validator and apply (`ops.ts`), version compare (`diff.ts`) and the v0.3 migration (`migrate.ts`). The 3D compiler moved to `src/view3d/compile.ts` and reads openings, per-level ceilings and head heights from v2.
+- Repo: versions gained `parent_id`, `author`, `ops_json`, `label`; schemes gained `role`; `comments` and `comment_replies` tables; `schema_version` = 2 in settings, and a page refuses to open a database written by a newer schema.
+- First open of a v0.3 scheme migrates it once and saves a new version by "migration" ("Updated to the new model (every wall and opening kept)"); the v0.3 version stays in the history. Schemes whose name starts with "As-built" get role asbuilt, so Velda's design changes there branch to a new scheme.
+- Room capture: still compiles on v2 and stays behind the Experimental switch; removed from the welcome text and from Velda's prompt.
+
+Evidence:
+- `npm run check` green: 35 unit tests in 5 files, 3 browser tests. The named ones for this phase: `tests/model/v2.test.ts` (16: joints, gap healing, rooms with clear sizes and stable ids, moving the dividing wall 12 in changes one room by +12 and the other by -12 with the door kept in place, corner and tee neighbors stretch, the 6 in engineer note rule, only a person can mark a wall no-load, Velda edits carry their version label, dimension conflict, compare), `tests/model/ops.test.ts` (4, the v0.3 op rules on v2), `tests/model/migrate.test.ts` (8: the live As-built head keeps all 108 walls and 51 openings; window glass heights become head heights; 9'-6" ceilings come over as assumed; exterior walls load-bearing; every near-miss joint healed; level 2 rooms derived with the primary bedroom at 235.7 x 220.8 in against 19'-8" by 18'-5 1/2" and the laundry at 89.6 x 116.9 against 7'-6 3/4" by 9'-9 1/4"; the kitchen scheme and its items in the same frame), `tests/e2e/migration.spec.ts` (a v0.3 scheme opened in the page migrates once, keeps its old version, keeps every wall and opening), `tests/e2e/smoke.spec.ts` (the local preview runs on the migrated v2 model and draws the 3D view).
+- CI run 39133105771 on f5fc9dc: success in 2m41s. CI run 39133825505 on 52bca0e (release pointer): success in 1m57s.
+- Dev release with `scripts/release.sh`: check passed inside the script, build 9c4d3cc for `velda_studio_dev.duckdb`, `release.json` on main points at it.
+- Screenshot: `docs/buildlog/phase1-local-preview-migrated.jpg`, the current UI on the migrated model (same view as the Phase 0 baseline; all 116 walls, 45 openings and 29 rooms of the preview fixture in the scene). Queued for copying to `velda-studio/buildlog/` on the next signed-in open.
+
+Open:
+- Migration of N8's real schemes on the test copy: unverified in Toolbelt. It runs the first time the page opens signed in; then `versions` in `velda_studio_dev.duckdb` should show one "migration" version per scheme and the As-built head should still have 108 walls and 51 openings.
+- 13 of the 25 As-built rooms keep their v0.3 outlines (flagged open outline) because gaps in the v0.3 trace merge them. The Phase 2 import of A2 replaces level 2 with traced, dimension-checked walls; level 1 waits for the A1 sheet.
+- Phase 0 platform re-test still waits on the signed-in page (no change).
+
+Decisions N8 needs: none. Needs from N8: sign in to Toolbelt once in the Claude app's built-in browser (still pending).
+
+Next: Phase 2, the import pipeline.
