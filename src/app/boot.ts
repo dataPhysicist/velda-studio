@@ -48,7 +48,13 @@ export async function boot() {
     await openScheme(first.id)
     void import('./actions').then((m) => m.loadCaptures()).catch((e) => console.warn('[studio] captures not loaded', e))
     // Platform checks run only when asked for in the database (settings platform_check = 'run').
-    if (sdk) void import('../platform/check').then((m) => m.maybeRunPlatformCheck(sdk, repo)).catch((e) => console.warn('[studio] platform check failed', e))
+    if (sdk)
+      void import('../platform/check')
+        .then(async (m) => {
+          await m.maybeRunPlatformCheck(sdk, repo)
+          await m.maybeSyncBuildlog(sdk, repo)
+        })
+        .catch((e) => console.warn('[studio] platform check failed', e))
   } catch (e) {
     console.error('[studio] boot failed', e)
     set({ status: null, error: `Velda Studio could not start: ${(e as Error).message || e}` })

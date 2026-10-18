@@ -3,7 +3,7 @@
 // The app runs in a cross-origin iframe inside Toolbelt, so these checks run from inside the app and
 // write their results to the database, where they can be read back without scripting the page. They
 // run once when the settings row platform_check = 'run' exists in the database this build uses.
-import type { Repo } from '../repo'
+import { type Repo, toB64 } from '../repo'
 import { DB, lit, type ToolbeltSDK } from '../toolbelt'
 
 declare const __STUDIO_VERSION__: string
@@ -135,6 +135,41 @@ export async function pdfSummary(bytes: Uint8Array) {
   } finally {
     port.terminate()
   }
+}
+
+/**
+ * Copy build-log images from the repo into Velda storage (velda-studio/buildlog/), where the build log
+ * says evidence lives. Runs once when settings buildlog_sync holds {"ref": "<commit>", "files": [...]}.
+ * Only images under docs/buildlog/ are copied.
+ */
+export async function maybeSyncBuildlog(sdk: ToolbeltSDK, repo: Repo) {
+  const raw = await repo.setting('buildlog_sync').catch(() => null)
+  if (!raw || !raw.startsWith('{')) return null
+  let job: { ref?: string; files?: string[] }
+  try {
+    job = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  const ref = /^[0-9a-f]{7,40}$/.test(job.ref ?? '') ? job.ref! : 'main'
+  const done: string[] = []
+  const failed: string[] = []
+  for (const f of job.files ?? []) {
+    const m = /^docs\/buildlog\/([\w.-]+\.(png|jpg|jpeg|webp))$/i.exec(f)
+    if (!m) continue
+    try {
+      const res = await fetch(`https://raw.githubusercontent.com/dataPhysicist/velda-studio/${ref}/${f}`, { cache: 'no-store' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const bytes = new Uint8Array(await res.arrayBuffer())
+      const type = /png$/i.test(f) ? 'image/png' : /webp$/i.test(f) ? 'image/webp' : 'image/jpeg'
+      await sdk.upload(`velda-studio/buildlog/${m[1]}`, toB64(bytes), type)
+      done.push(m[1])
+    } catch (e) {
+      failed.push(`${f}: ${(e as Error).message}`)
+    }
+  }
+  await repo.setSetting('buildlog_sync', `done ${new Date().toISOString()} copied ${done.length}${failed.length ? `, failed ${failed.join('; ')}` : ''}`)
+  return { done, failed }
 }
 
 async function sha256(b: Uint8Array) {
