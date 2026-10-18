@@ -62,7 +62,7 @@ export interface Repo {
 }
 
 /** Binary assets kept in DuckDB (generated 3D models, captured point clouds), base64 in 512 KB parts. */
-export type BlobMeta = { id: string; kind: 'glb' | 'points'; name: string; size: number; meta: Record<string, unknown> }
+export type BlobMeta = { id: string; kind: 'glb' | 'points' | 'pdf' | 'plan'; name: string; size: number; meta: Record<string, unknown> }
 /** A room captured from photos or video: where its point cloud sits in the plan and what was measured. */
 export type Capture = {
   id: string

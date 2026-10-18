@@ -29,6 +29,8 @@ export async function boot() {
     lib: () => Promise.all([import('../lib/capture'), import('./actions'), import('./ViewerExtras')]).then(([capture, actions, extras]) => ({ capture, actions, extras })),
     // Platform checks (workers, pdf.js) for the browser tests and the console.
     platform: () => import('../platform/check'),
+    // The plan import, for the browser tests and the console.
+    importFlow: () => import('./importFlow'),
   }
   try {
     await repo.init()

@@ -101,39 +101,26 @@ export async function pingWorker() {
   }
 }
 
-/** Open a PDF with pdf.js running on its own inline worker and count what page 1 holds. */
+/**
+ * Open a PDF the way the plan import does (pdf.js on its inline worker, pictures over 4 MP left to us)
+ * and count what page 1 holds.
+ */
 export async function pdfSummary(bytes: Uint8Array) {
-  const pdfjs = await import('pdfjs-dist')
-  const { default: PdfWorker } = await import('pdfjs-dist/build/pdf.worker.min.mjs?worker&inline')
-  const port = new PdfWorker()
-  pdfjs.GlobalWorkerOptions.workerPort = port
-  try {
-    const task = pdfjs.getDocument({ data: bytes })
-    const doc = await task.promise
-    const page = await doc.getPage(1)
-    const text = await page.getTextContent()
-    const ops = await page.getOperatorList()
-    const OPS = pdfjs.OPS as Record<string, number>
-    const count = (code: number) => ops.fnArray.filter((f) => f === code).length
-    // Image paints with their pixel size. On a Designs Unlimited sheet each JPEG is drawn through a soft
-    // mask whose own image is painted too, so the plan size appears twice; the adapter takes the JPEG.
-    const images = ops.fnArray.flatMap((f, i) => (f === OPS.paintImageXObject ? [[ops.argsArray[i]?.[1], ops.argsArray[i]?.[2]]] : []))
-    const vp = page.getViewport({ scale: 1 })
-    const pages = doc.numPages
-    await task.destroy()
-    return {
-      pdfjs: pdfjs.version,
-      pages,
-      pageSizePt: [Math.round(vp.width), Math.round(vp.height)],
-      textItems: text.items.filter((i: any) => 'str' in i && i.str.trim()).length,
-      ops: ops.fnArray.length,
-      paintImageXObject: count(OPS.paintImageXObject),
-      images,
-      constructPath: count(OPS.constructPath),
-      setGState: count(OPS.setGState),
-    }
-  } finally {
-    port.terminate()
+  const adapter = await import('../import/pdf-adapter')
+  const read = await adapter.readPdf('check.pdf', bytes)
+  const lib = await adapter.pdfjs()
+  const p = read.pages[0]
+  // Each Designs Unlimited JPEG is drawn through a soft mask whose own image is placed too, so the
+  // plan's size appears twice; the import takes the JPEG.
+  return {
+    pdfjs: lib.version,
+    pages: read.pages.length,
+    pageSizePt: [Math.round(p.size[0]), Math.round(p.size[1])],
+    textItems: p.text.length,
+    paintImageXObject: p.images.length,
+    images: p.images.map((i) => i.px),
+    segs: p.segs.length,
+    fills: p.fills.length,
   }
 }
 

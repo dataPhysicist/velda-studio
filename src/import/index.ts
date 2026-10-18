@@ -69,7 +69,7 @@ const id = (prefix: string, i: number) => `${prefix}${i + 1}`
 export function importSheet(
   page: PageData,
   trace: TraceResult | null,
-  opts: { file?: string; level?: string; levelName?: string; role?: 'asbuilt' | 'proposed'; defaults?: Partial<ImportDefaults>; projectName?: string } = {},
+  opts: { file?: string; level?: string; levelName?: string; role?: 'asbuilt' | 'proposed'; defaults?: Partial<ImportDefaults>; projectName?: string; ignoreDims?: string[] } = {},
 ): SheetImport {
   const t0 = performance.now()
   const timing: Record<string, number> = { ...(trace?.timingMs ?? {}) }
@@ -146,8 +146,10 @@ export function importSheet(
   timing.heal = Math.round(performance.now() - t0) - timing.read
 
   // ---- strings govern: the solver
+  // Strings the person chose to overrule ("use traced") stay on the plan but do not move walls.
+  const ignored = new Set(opts.ignoreDims ?? [])
   const solveDims = dims
-    .filter((d) => d.line)
+    .filter((d) => d.line && !ignored.has(d.id))
     .map((d) => ({ id: d.id, text: d.text, value: d.inches, a: toSheet(frame, d.line!.a), b: toSheet(frame, d.line!.b) }))
   const solved = solveDimensions(walls, openings, solveDims, { sheet: sheetId, level })
   walls = solved.walls

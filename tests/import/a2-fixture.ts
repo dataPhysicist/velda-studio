@@ -7,7 +7,7 @@ import { traceWalls } from '../../src/import/raster/trace'
 import type { Gray, PageData } from '../../src/import/types'
 
 const root = new URL('../../scripts/fixtures/', import.meta.url)
-export const truth = JSON.parse(readFileSync(new URL('A2-asbuilt-level2.ground-truth.json', root), 'utf8'))
+export { truth } from './a2-checks'
 export const capture = JSON.parse(readFileSync(new URL('A2-asbuilt-level2.adapter.json', root), 'utf8'))
 export const page: PageData = capture.pages[0]
 

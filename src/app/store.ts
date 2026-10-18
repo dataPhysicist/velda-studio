@@ -259,6 +259,21 @@ export async function newSchemeFromCurrent(name: string) {
   await openScheme(id)
 }
 
+/** A new scheme from a model made elsewhere (a plan import); opens it. */
+export async function createScheme(opts: { name: string; role: 'asbuilt' | 'proposed'; model: Model; summary: string; author: Author; source: string }) {
+  const { repo, schemes } = get()
+  if (!repo) throw new Error('No database')
+  const id = sid('s')
+  const scheme: Scheme = { id, name: uniqueSchemeName(opts.name), head_version: null, sort: (schemes[schemes.length - 1]?.sort ?? 0) + 1, role: opts.role }
+  await repo.saveScheme(scheme)
+  const v: Version = { id: sid('v'), scheme_id: id, seq: 1, summary: opts.summary, source: opts.source, parent_id: null, author: opts.author, label: `v1 ${opts.summary}` }
+  await repo.addVersion(v, opts.model)
+  await repo.saveScheme({ ...scheme, head_version: v.id })
+  set({ schemes: await repo.schemes() })
+  await openScheme(id)
+  return { scheme: { ...scheme, head_version: v.id }, version: v }
+}
+
 // ------------------------------------------------------------------ conversation
 
 export async function addMessage(m: Omit<Message, 'id' | 'scheme_id'>) {
@@ -457,7 +472,7 @@ export function isAsBuilt() {
   return !!s && (s.role === 'asbuilt' || (s.role == null && /^as-built/i.test(s.name)))
 }
 
-function uniqueSchemeName(base: string) {
+export function uniqueSchemeName(base: string) {
   const names = new Set(get().schemes.map((s) => s.name))
   if (!names.has(base)) return base
   for (let i = 2; ; i++) if (!names.has(`${base} ${i}`)) return `${base} ${i}`

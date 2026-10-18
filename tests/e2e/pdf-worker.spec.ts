@@ -6,7 +6,8 @@ const truth = JSON.parse(readFileSync(new URL('../../scripts/fixtures/A2-asbuilt
 // The import pipeline needs workers that start from inside studio.js (the Toolbelt page loads it
 // from jsDelivr, so a worker file URL would be cross-origin). This proves both workers start in a page
 // and that pdf.js reads the real A2 sheet the way the ground truth describes it.
-test('pdf.js on its bundled worker reads the A2 sheet inside the page', async ({ page }) => {
+test('pdf.js on its bundled worker reads the A2 sheet inside the page, as the plan import does', async ({ page }) => {
+  test.setTimeout(6 * 60_000) // two cores and SwiftShader in CI; seconds on a laptop
   await page.goto('/')
   await page.waitForFunction(() => !!(window as any).__studio?.platform)
   const result = await page.evaluate(async () => {

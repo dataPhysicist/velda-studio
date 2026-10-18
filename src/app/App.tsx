@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { finishFor, ROLES, swatches, type Theme } from '../lib/theme'
 import type { Attachment, Message } from '../repo'
 import { DB, LIVE_DB } from '../toolbelt'
+import { ImportFlow } from './Import'
+import { startImport, useImport } from './importFlow'
 import { Stage } from './Stage'
 import { enterWalk, exitWalk, focusOn, goToVersion, isDeep, newSchemeFromCurrent, openScheme, send, stepVersion, uploadAttachment, uploadVideo, useStudio } from './store'
 
@@ -13,6 +15,8 @@ export function App() {
   const model = useStudio((s) => s.model)
   const [drag, setDrag] = useState(false)
   const composer = useRef<ComposerApi>(null)
+  // The import covers the studio; drop the 3D view meanwhile so the trace has the machine to itself.
+  const importing = useImport((s) => s.stage !== 'idle')
 
   return (
     <div
@@ -29,11 +33,14 @@ export function App() {
       onDrop={(e) => {
         e.preventDefault()
         setDrag(false)
-        if (e.dataTransfer.files.length) composer.current?.add([...e.dataTransfer.files])
+        const files = [...e.dataTransfer.files]
+        const pdf = files.find((f) => /pdf$/i.test(f.type) || /\.pdf$/i.test(f.name))
+        if (pdf) void startImport(pdf)
+        else if (files.length) composer.current?.add(files)
       }}
     >
       <main className="stage-pane">
-        <Stage />
+        {!importing && <Stage />}
         <TitleBlock />
         <div className="stage-foot">
           <div className="foot-left">
@@ -49,9 +56,10 @@ export function App() {
             <p className={error ? 'veil-error' : ''}>{error ?? status ?? 'Loading'}</p>
           </div>
         )}
-        {drag && <div className="drop-hint">Drop photos to show Velda</div>}
+        {drag && <div className="drop-hint">Drop photos to show Velda, or a plan PDF to bring it in</div>}
       </main>
       <Conversation composerRef={composer} />
+      <ImportFlow />
     </div>
   )
 }
@@ -100,6 +108,7 @@ function TitleBlock() {
         >
           {copying ? 'Saving…' : 'Save as a new scheme'}
         </button>
+        <BringInPlan />
         <TestDataNote />
       </div>
       <h1 className="room-title">{room?.name ?? (levelId ? model?.levels.find((l) => l.id === levelId)?.name : 'Whole house')}</h1>
@@ -128,6 +137,31 @@ function TitleBlock() {
         ))}
       </nav>
     </header>
+  )
+}
+
+/** Upload a plan set (PDF): opens the page strip, then the Confirm screen for each floor plan. */
+function BringInPlan() {
+  const input = useRef<HTMLInputElement>(null)
+  return (
+    <>
+      <button type="button" className="link" onClick={() => input.current?.click()}>
+        Bring in a plan
+      </button>
+      <input
+        ref={input}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="sr-only"
+        aria-label="Plan PDF"
+        data-testid="plan-file"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          e.target.value = ''
+          if (f) void startImport(f)
+        }}
+      />
+    </>
   )
 }
 

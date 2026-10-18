@@ -179,19 +179,35 @@ export async function readPage(page: PdfPage, OPS: Record<string, number>): Prom
   const segs: Seg[] = []
   const fills: Fill[] = []
   const images: ImagePaint[] = []
+  // When pdf.js is told to skip big images (maxImageSize), their paint op disappears but the
+  // placement transform stays: a save, a transform onto a large rectangle, nothing drawn, restore.
+  // Record those as image placements whose pixel size comes from the file (pdf-images.ts).
+  const pageArea = vp.width * vp.height
+  type Frame = { big: Box | null; drew: boolean }
+  const frames: Frame[] = [{ big: null, drew: false }]
+  const unitRect = (m: M): Box => bboxOf([apply(m, [0, 0]), apply(m, [1, 0]), apply(m, [1, 1]), apply(m, [0, 1])])
   for (let i = 0; i < ops.fnArray.length; i++) {
     const op = names[ops.fnArray[i]]
     const a = ops.argsArray[i]
+    if (op && /^(constructPath|showText|paint|beginText)/.test(op)) frames[frames.length - 1].drew = true
     switch (op) {
       case 'save':
         stack.push({ ...g })
+        frames.push({ big: null, drew: false })
         break
-      case 'restore':
+      case 'restore': {
         g = stack.pop() ?? g
+        const f = frames.length > 1 ? frames.pop()! : null
+        if (f?.big && !f.drew) images.push({ id: `placed_${i}`, px: [0, 0], rect: f.big, mask: maskDepth > 0 })
+        if (f?.drew) frames[frames.length - 1].drew = true
         break
-      case 'transform':
+      }
+      case 'transform': {
         g.ctm = compose(Array.from(a) as M, g.ctm)
+        const r = unitRect(compose(g.ctm, view))
+        if ((r[2] - r[0]) * (r[3] - r[1]) > pageArea * 0.05) frames[frames.length - 1].big = r
         break
+      }
       case 'paintFormXObjectBegin':
         stack.push({ ...g })
         if (a?.[0]) g.ctm = compose(Array.from(a[0]) as M, g.ctm)

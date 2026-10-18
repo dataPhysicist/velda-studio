@@ -137,6 +137,11 @@ describe('A2 as-built level 2: import accuracy gate', () => {
     expect(report.fixtureStrings.length + report.unresolved.length + report.sheets[0].dims.bound).toBeGreaterThanOrEqual(96)
   })
 
+  it('passes the shared check the browser test uses', async () => {
+    const { checkA2Model } = await import('./a2-checks')
+    expect(checkA2Model(a2().result.model)).toEqual([])
+  })
+
   it('every number carries where it came from: strings govern the walls they bind, the rest is traced or assumed', () => {
     const { model } = a2().result
     const srcs = new Set(model.walls.map((w) => w.prov.a.src))

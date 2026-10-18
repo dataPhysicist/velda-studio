@@ -156,3 +156,101 @@ kbd { font: 600 11px var(--sans); border: 1px solid var(--line); border-bottom-w
 .compare-tag.left { left: 8px; }
 .compare-tag.right { right: 8px; }
 .compare-open { position: absolute; right: 8px; bottom: 8px; font-size: 12px; background: rgba(251, 251, 248, 0.92); color: var(--graphite); padding: 3px 9px; border-radius: 10px; text-decoration: none; }
+
+/* ---------------------------------------------------------------- plan import
+   One screen to check a sheet. The drawing itself is the evidence, so it gets the room; what we read
+   is set as sentences, the questions sit beside them. Ink means a drawn dimension governs, amber
+   means traced only, red means the two disagree. */
+:root {
+  --ink: #23282c;
+  --amber: #a5670f;
+  --assumed: #8a9297;
+  --velda: #2f5f9e;
+  --confirm: #b24f8f;
+}
+.btn { border: 1px solid var(--line); background: var(--paper); border-radius: 6px; padding: 7px 16px; }
+.btn:hover { border-color: var(--slate); }
+.btn.primary { background: var(--verdigris); border-color: var(--verdigris); color: #fff; }
+.btn.primary:hover { background: #255850; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 3px 11px; font-size: 13px; color: var(--slate); }
+.chips button:hover { color: var(--graphite); border-color: var(--slate); }
+.chips button[aria-pressed='true'] { background: var(--verdigris-soft); border-color: var(--verdigris); color: var(--verdigris); }
+
+.import { position: fixed; inset: 0; z-index: 40; background: var(--plaster); display: flex; flex-direction: column; min-width: 980px; }
+.imp-bar { padding: 16px 22px 12px; border-bottom: 1px solid var(--line); background: var(--vellum); }
+.imp-title { font: 400 30px/1.1 var(--serif); margin: 0 0 4px; }
+.imp-title .muted { font: 400 15px/1.4 var(--sans); margin-left: 10px; letter-spacing: 0; }
+.imp-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 22px; border-top: 1px solid var(--line); background: var(--vellum); }
+
+.imp-working { margin: auto; max-width: 520px; padding: 28px 32px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; }
+.imp-working-head { font: 400 30px/1.15 var(--serif); margin: 0 0 8px; }
+
+.imp-pages { display: flex; flex-direction: column; height: 100%; }
+.imp-strip { list-style: none; margin: 0; padding: 18px 22px; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; overflow: auto; flex: 1; align-content: start; }
+.imp-strip li { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.imp-strip li.is-skipped { opacity: 0.55; }
+.imp-strip img { width: 100%; display: block; border: 1px solid var(--line); background: #fff; }
+.imp-page-name { margin: 8px 0; font-weight: 600; }
+.imp-page-name .muted { font-weight: 400; }
+
+.imp-confirm { display: grid; height: 100%; grid-template-columns: minmax(0, 1fr) 380px 320px; grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'bar bar bar' 'sheet read ask' 'foot foot foot'; }
+.imp-confirm > .imp-bar { grid-area: bar; }
+.imp-confirm > .imp-foot { grid-area: foot; }
+.imp-sheet { grid-area: sheet; position: relative; background: #fff; border-right: 1px solid var(--line); min-height: 0; }
+.imp-read { grid-area: read; overflow: auto; padding: 18px 24px 24px; border-right: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.imp-ask { grid-area: ask; overflow: auto; padding: 18px 20px 24px; background: var(--vellum); }
+.imp-read h3, .imp-ask h3 { font: 600 15px/1.3 var(--sans); margin: 0 0 12px; color: var(--slate); }
+.imp-read p { margin: 0 0 14px; max-width: 34em; }
+.imp-read .lede { font: 400 22px/1.3 var(--serif); }
+.imp-read .lede b { font-weight: 400; color: var(--verdigris); }
+.disclose { background: none; border: 0; padding: 0; text-align: left; }
+.disclose::before { content: '▸'; display: inline-block; width: 1em; color: var(--slate); transition: transform 0.15s; }
+.disclose[aria-expanded='true']::before { transform: rotate(90deg); }
+.imp-list { margin: -6px 0 14px; padding-left: 1.2em; font-size: 14px; color: var(--slate); }
+.imp-list li { margin: 3px 0; }
+
+.imp-q { display: grid; gap: 14px; }
+.imp-q label, .imp-q fieldset { display: grid; gap: 5px; border: 0; padding: 0; margin: 0; }
+.imp-q label > span, .imp-q legend { font-size: 13px; color: var(--slate); padding: 0; }
+.imp-q select, .imp-q input, .imp-q textarea { font: inherit; color: var(--graphite); background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; }
+.imp-q textarea { resize: vertical; }
+
+.sheet-view { position: absolute; inset: 0; }
+.sheet-view svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+.sheet-view svg:active { cursor: grabbing; }
+.sheet-raster { opacity: 0.4; }
+.sheet-view .hit { cursor: pointer; }
+.wall { fill: var(--ink); fill-opacity: 0.82; }
+.wall.src-sheet_raster { fill: var(--amber); fill-opacity: 0.75; }
+.wall.is-demolish { stroke: var(--warn); stroke-width: 1.5px; vector-effect: non-scaling-stroke; stroke-dasharray: 3 2; }
+.wall.is-selected, .op.is-selected line, .op.is-selected .op-arc { fill: var(--verdigris); stroke: var(--verdigris); fill-opacity: 1; }
+.op line, .op .op-arc { stroke: var(--ink); stroke-width: 1px; vector-effect: non-scaling-stroke; fill: none; }
+.op-gap { fill: #fff; fill-opacity: 0.9; }
+.op-window line { stroke: var(--ink); }
+.op-opening .op-jamb { stroke-dasharray: 2 2; }
+.room { fill: var(--verdigris); fill-opacity: 0.05; }
+.room.is-confirm { fill: var(--confirm); fill-opacity: 0.08; }
+.room-name { font: 600 6px var(--sans); text-anchor: middle; fill: var(--graphite); paint-order: stroke; stroke: #fff; stroke-width: 1.2px; stroke-opacity: 0.85; }
+.tint { fill: none; stroke-width: 1px; vector-effect: non-scaling-stroke; }
+.tint-demolish { stroke: var(--velda); stroke-dasharray: 4 3; }
+.tint-confirm { stroke: var(--confirm); stroke-dasharray: 1 3; }
+.stair { fill: none; stroke: var(--slate); stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-dasharray: 6 3; }
+.dim line { stroke: var(--ink); stroke-width: 0.8px; vector-effect: non-scaling-stroke; }
+.dim text { font: 500 4.2px var(--sans); font-stretch: 82%; text-anchor: middle; fill: var(--ink); font-variant-numeric: tabular-nums; }
+.dim-unresolved line { stroke: var(--assumed); stroke-dasharray: 2 2; }
+.dim-unresolved text { fill: var(--assumed); }
+.dim-conflict line { stroke: var(--warn); }
+.dim-conflict text { fill: var(--warn); }
+.sheet-key { position: absolute; left: 12px; bottom: 10px; display: flex; gap: 14px; font-size: 12px; color: var(--slate); background: rgba(251, 251, 248, 0.92); padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line); }
+.sheet-key .k::before { content: ''; display: inline-block; width: 14px; height: 5px; margin-right: 6px; vertical-align: 2px; background: var(--ink); }
+.sheet-key .k-raster::before { background: var(--amber); }
+.sheet-key .k-conflict::before { background: var(--warn); }
+.sheet-pop { position: absolute; right: 12px; top: 12px; width: 260px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: grid; gap: 10px;
+  box-shadow: 0 14px 30px -16px rgba(35, 40, 44, 0.45); }
+.sheet-pop p { margin: 0; }
+@media (prefers-reduced-motion: reduce) { .disclose::before { transition: none; } }
+.imp-fix { display: grid; gap: 8px; margin: -4px 0 16px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--vellum); }
+.imp-fix p { margin: 0; }
+p.chips { margin: -6px 0 14px; }
