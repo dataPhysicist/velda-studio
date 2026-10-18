@@ -33,7 +33,7 @@ Where Playwright's Chromium download is blocked (this build sandbox), set `PW_CH
 - 2026-10-18 Pascal's catalog items (toilet, bathtub GLBs) load from a Supabase storage host, not from this repo. Blocked in the build sandbox; works in the live page as far as is known. Noted as an outside dependency; Phase 4 checks whether to vendor the few we use.
 - 2026-10-18 Design direction for Phases 2 and 3 (frontend-design skill loaded, kept consistent with 06 section 10): keep the existing plaster, graphite and verdigris chrome; verdigris stays the one action and selection color, so it never collides with the provenance colors (measured ink, traced amber, assumed grey, set by Velda blue, conflict red). Instrument Sans for the interface with tabular figures; dimension strings in a condensed face at 11 px or more. No gradients on new panels, 1 px borders, words not icons outside the five-tool strip.
 
-## 2026-10-18  Phase 0  commit fcf6029 (dev release pending)
+## 2026-10-18  Phase 0  commit eaa8f33 (dev release, build 5f119ff)
 
 Done:
 - Read 00 to 10, the ground truth, the spike notes and the 3D Studio plan. Cloned main (199db74, package.json 0.2.0); read the files listed in the prompt. The docs match the repo with these differences: the current "Plan" button is a top-down camera on the 3D view, not a 2D editor; v1 keeps one `ceiling` on the model and a `height` per level (both 114, 9'-6"); `DB` was a fixed constant (now switchable); the sub-chat is called through the bare name `create_sub_chat`, resolved against the tool list; `release.json` points at c2fffca.
@@ -44,12 +44,14 @@ Done:
 
 Evidence:
 - `npm run check` green locally: unit `tests/model/ops.test.ts` (4), `tests/model/database.test.ts` (2), `tests/import/dims.test.ts` (5, all 98 A2 strings); browser `tests/e2e/smoke.spec.ts` (local preview opens, 2 levels, 3D canvas) and `tests/e2e/pdf-worker.spec.ts` (both inline workers start; pdf.js reads A2: 1 page, 2592 x 1728, 147 text items, 4 image paints).
-- CI run 39129827135 on 3112297: success in 1m21s.
-- Screenshot of the local preview before any change: `velda-studio/buildlog/phase0-local-preview-baseline.png`.
+- CI run 39129827135 on 3112297: success in 1m21s. CI run 39130735611 on eaa8f33 (the release): success in 2m9s.
+- Dev release with `scripts/release.sh`: `npm run check` passed inside the script (11 unit, 2 browser), build 5f119ff for `velda_studio_dev.duckdb`, `release.json` on main points at it.
+- Screenshot of the local preview before any change: `docs/buildlog/phase0-local-preview-baseline.jpg` in the repo; the signed-in page copies it to `velda-studio/buildlog/` on its next open (settings `buildlog_sync` is set in the test database).
 
 Open:
-- Platform re-test in the signed-in page (inline worker in the iframe, sub-chat relay from the Studio page, a 512 KB blob part round trip, SQL against the dev database) runs after the dev release.
+- Platform re-test in the signed-in page: unverified in Toolbelt. The built-in browser is not signed in to toolbelt.apexti.com (it lands on /login). The check is armed (settings `platform_check` = run in `velda_studio_dev.duckdb`); it runs the first time the Velda Studio page opens signed in and writes one row per item to `platform_checks`: database, tool list, inline worker, pdf.js on its worker reading A2, 783 KB image through 512 KB parts, sub-chat round trip. Locally the worker and pdf.js items already pass in a page (`tests/e2e/pdf-worker.spec.ts`).
+- jsDelivr is blocked from the build sandbox, so the CDN cache for 5f119ff is warmed by the first page load, not by the script.
 
-Decisions N8 needs: none.
+Decisions N8 needs: none. Needs from N8: sign in to Toolbelt once in the Claude app's built-in browser.
 
-Next: dev release; open the Velda Studio page signed in; run the platform check; record the results here; Phase 1 (model v2 and migration).
+Next: Phase 1 (model v2 and migration) in parallel; when N8 has signed in, open the Velda Studio page, read `platform_checks`, record pass or fail per item here, and finish the manual checklist items that need the page.
