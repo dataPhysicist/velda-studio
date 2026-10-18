@@ -3009,13 +3009,15 @@
   ],
   "openings_expected_on_level": {
    "windows": 14,
-   "doors": 14,
-   "cased_openings": 2,
-   "note": "from the hand-checked v0.3 pass; a correct import may differ by one or two and must then show the difference in the Confirm step rather than silently drop it"
+   "doors": 15,
+   "cased_openings": 5,
+   "note": "counted from reference_walls_v0_3 after the 2026-10-18 corrections (the v0.3 pass had 14 doors and 2 cased openings; strings on the sheet add two doors and two cased openings, and the 79 in sliding door is an open passage on the drawing). A correct import may differ by one or two and must then show the difference in the Confirm step rather than silently drop it"
   },
   "walls_expected": {
    "count": 59,
-   "tol": 4
+   "tol": 4,
+   "counted_as": "wall segments between tees, the same rule on both sides: every wall is split where another wall at least 2 ft long (or exterior) ends on it, never into pieces under 12 in, never inside an opening (splitAtJunctions in src/import/index.ts). The reference after the 2026-10-18 corrections counts the expected number this way; the test computes it rather than trusting a typed number.",
+   "note": "59 is the v0.3 list as typed; v0.3 split some walls at junctions and not others (L2w28 to L2w30 split where walls tee in, L2w3 not split where L2w44 and L2w45 tee in), so a raw count only matches an import that happens to split the same way"
   },
   "rooms_expected": 14,
   "tint_checks": {
@@ -3879,11 +3881,11 @@
      },
      {
       "id": "L2w49d2",
-      "kind": "door",
+      "kind": "opening",
       "at": 195.5,
       "w": 79,
       "h": 80,
-      "style": "sliding"
+      "style": "cased"
      }
     ]
    },
@@ -4038,7 +4040,16 @@
      556.5
     ],
     "t": 7,
-    "openings": []
+    "openings": [
+     {
+      "id": "L2w58o1",
+      "kind": "opening",
+      "at": 47.85,
+      "w": 66,
+      "h": 80,
+      "style": "cased"
+     }
+    ]
    },
    {
     "id": "L2w59",
@@ -4061,10 +4072,89 @@
       "style": "swing"
      }
     ]
+   },
+   {
+    "id": "L2w60",
+    "a": [
+     82.3,
+     608.4
+    ],
+    "b": [
+     126.7,
+     608.4
+    ],
+    "t": 4.5,
+    "openings": [
+     {
+      "id": "L2w60d1",
+      "kind": "door",
+      "at": 22.17,
+      "w": 28,
+      "h": 80,
+      "style": "swing"
+     }
+    ]
+   },
+   {
+    "id": "L2w61",
+    "a": [
+     474.8,
+     467.4
+    ],
+    "b": [
+     524.3,
+     467.4
+    ],
+    "t": 4,
+    "openings": [
+     {
+      "id": "L2w61d1",
+      "kind": "door",
+      "at": 23.5,
+      "w": 32,
+      "h": 80,
+      "style": "swing"
+     }
+    ]
+   },
+   {
+    "id": "L2w62",
+    "a": [
+     474.8,
+     559.7
+    ],
+    "b": [
+     524.3,
+     559.7
+    ],
+    "t": 4,
+    "openings": [
+     {
+      "id": "L2w62o1",
+      "kind": "opening",
+      "at": 23.55,
+      "w": 32,
+      "h": 80,
+      "style": "cased"
+     }
+    ]
+   },
+   {
+    "id": "L2w63",
+    "a": [
+     618.4,
+     373.3
+    ],
+    "b": [
+     648.9,
+     373.3
+    ],
+    "t": 6,
+    "openings": []
    }
   ],
   "known_gaps": [
-   "missing: the wall between the Jack and Jill shower and Guest Bathroom 2 at y about 608.4 from x 82.3 to 126.7, with a 2'-4\" door (string 90.47 to 118.46 at y 606.47)",
+   "added as L2w60 on 2026-10-18 (was missing: the wall between the Jack and Jill shower and Guest Bathroom 2 at y about 608.4 from x 82.3 to 126.7, with a 2'-4\" door, string 90.47 to 118.46 at y 606.47)",
    "positions are the v0.3 trace (within about 1.5 in); where a string disagrees, the string wins",
    "Phase 2 lists every other unmatched wall in the import report rather than assuming the reference is complete"
   ]
@@ -4427,6 +4517,41 @@
    "date": "2026-10-18",
    "by": "Phase 0 check",
    "what": "147 spans are not all Georgia; the title block uses Helvetica, Arial and Verdana."
+  },
+  {
+   "date": "2026-10-18",
+   "by": "Phase 2 import",
+   "what": "reference_walls_v0_3: added L2w60, the known missing wall between the Jack and Jill shower and Guest Bathroom 2, with its 2'-4\" door (string 2'-4\" spans 90.47 to 118.46 at y 606.47)."
+  },
+  {
+   "date": "2026-10-18",
+   "by": "Phase 2 import",
+   "what": "reference_walls_v0_3: added L2w61 at y 467.4 from L2w44 to L2w46 with a 32 in swing door. Evidence: string 2'-8\" spans 482.3 to 514.3 at y 467.4; raster faces at 465.4 and 469.4 (x 520) and no line across at x 490 (the opening); a swing arc is drawn."
+  },
+  {
+   "date": "2026-10-18",
+   "by": "Phase 2 import",
+   "what": "reference_walls_v0_3: added L2w62 at y 559.7 from L2w44 to L2w46 with a 32 in cased opening. Evidence: string 2'-8\" spans 482.3 to 514.3 at y 565.4; raster faces at 557.7 and 561.7 (x 478 and 520) and jamb lines at x 482.35 and 514.35; no leaf or arc."
+  },
+  {
+   "date": "2026-10-18",
+   "by": "Phase 2 import",
+   "what": "reference_walls_v0_3: added L2w63, the 6 in wall over the primary bath shower at y 373.3 from 618.4 to 648.9. Evidence: raster faces at 370.25 and 376.35 (x 630 and 645); string 2'-6\" (x 619.9, 340.4 to 370.3) ends on its face."
+  },
+  {
+   "date": "2026-10-18",
+   "by": "Phase 2 import",
+   "what": "reference_walls_v0_3: L2w58 gets its 66 in cased opening into the walk-in closet. Evidence: string 5'-6\" spans 392.8 to 458.9 at y 558.9; raster at x 420 has no line between y 553 and 575."
+  },
+  {
+   "date": "2026-10-18",
+   "by": "Phase 2 import",
+   "what": "reference_walls_v0_3: L2w49d2 is an open passage (cased opening), not a 79 in sliding door. Evidence: no leaf, track or jamb line drawn anywhere in x 612 to 625 for y 440 to 515."
+  },
+  {
+   "date": "2026-10-18",
+   "by": "Phase 2 import",
+   "what": "hard_checks.walls_expected is counted as segments between tees on both sides (see counted_as); openings_expected_on_level recounted from the corrected reference (doors 15, cased openings 5)."
   }
  ]
 }

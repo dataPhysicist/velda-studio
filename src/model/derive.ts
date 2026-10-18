@@ -129,10 +129,11 @@ export function healWalls(walls: Wall[]): { walls: Wall[]; moved: string[] } {
       }
       if (best && best.d > 1e-6) {
         const x = rv(best.x)
-        if (e === 'a') w.a = x
-        else w.b = x
-        if (best.oe === 'a') best.o.a = x
-        else best.o.b = x
+        // separate arrays: a shared point would move both walls when one is edited later
+        if (e === 'a') w.a = [...x]
+        else w.b = [...x]
+        if (best.oe === 'a') best.o.a = [...x]
+        else best.o.b = [...x]
         moved.add(w.id)
         moved.add(best.o.id)
       }
