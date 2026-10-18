@@ -101,3 +101,26 @@ Open:
 Decisions N8 needs: none. Needs from N8: sign in to Toolbelt once in the Claude app's built-in browser (still pending).
 
 Next: Phase 2, the import pipeline.
+
+## 2026-10-18  Phase 2  commits 07b2a79, b7db6fb, 47119c0 (dev release, build 50cfe6f)
+
+Done:
+- Adapter (`src/import/pdf-read.ts`, `pdf-images.ts`, `pdf-adapter.ts`): text spans, stroked lines, filled shapes with transparency and image placements from pdf.js 6.4.299, in page points with y down; the plan picture taken from the file's own JPEG stream (783,147 bytes on A2, the exact fixture); thumbnails for the page strip. Recorded capture: `scripts/fixtures/A2-asbuilt-level2.adapter.json` (`npx tsx scripts/capture-fixture.ts`).
+- Import stages, all pure and tested in Node (`src/import/`): sheet classification (number, title, level, as-built or proposed, scale text, firm, issue, tier), dimension strings with span merging, pairing and scale, raster tracing in a worker (`raster/`: Otsu threshold, thin-line chains, face pairs with clean cores, window bands, dashed lines, stairs, bridging, door-at-wall-end, exterior by flood fill, openings with swing arcs), labels and appliance tags, legend tints by hue, the dimension solver, loose-end closing, room derivation, multi-level alignment (`align.ts`), the import report, and the intake answers (`intake.ts`).
+- Screens (`src/app/Import.tsx`, `importFlow.ts`): "Bring in a plan" in the title row, or drop a PDF on the studio; the page strip; the Confirm screen (sheet with the trace over it, what we read, the intake questions, fixes in place: not a wall, door, window, open passage, nothing here; use traced or use drawn for a conflict); approving saves the PDF and the plan picture as blobs and opens the new scheme with "Imported from A2 (7.2.26)".
+
+Evidence:
+- `npm run test:import` green: `tests/import/a2.test.ts` (11 tests: scale 1.5000 from 96 of 98 strings and the title block agrees; all 14 rooms by name with W and D as washer and dryer; all 13 clear dimension checks after the solve; the 3 wall thickness checks; 76 wall segments against 76 in the reference counted the same way; 14 windows, 15 doors, 6 open passages against 14, 15, 5; 18 demolish and 4 confirm tints at their measured rectangles, Guest Bathroom 3 and Guest Bedroom 2 flagged; edit cost 7 of 8 allowed, every item listed; 0 conflicts and 7 unresolved items; provenance), `tests/import/align.test.ts` (A2 lands on the migrated v0.3 level 1 with a shift of 1, 1 in; 30 percent of the level 2 exterior within 3 in of a level 1 exterior wall), `tests/import/dims.test.ts`.
+- `npm run test:e2e` green: `tests/e2e/import.spec.ts` brings `A2-asbuilt-level2.pdf` in through the page's upload, pdf.js on its inline worker, the trace worker and the Confirm screen with its defaults, then runs the same checks on the saved scheme (all pass; ceiling 9 ft confirmed as the person's; plan picture saved, 783,147 bytes). 1.1 to 1.2 min in this two-core sandbox with SwiftShader.
+- Edit cost 7, listed: reference walls L2w12 and L2w53 (v0.3 read the tub apron and the tub end as walls; the trace has the walls beside them), L2w58 (the walk-in closet wall: the trace takes the hall-side line, v0.3 the closet side), the L2w31 passage center 2.7 in off, its 66 in opening on the other line, and a 24 in passage where v0.3 has a gap between two walls.
+- Unit tests 47 in 7 files; browser tests 4. CI run 39142679584 on 47119c0: success in 3m13s. Dev release: check passed inside the script, build 50cfe6f for `velda_studio_dev.duckdb`, `release.json` on main points at it.
+- Screenshot: `docs/buildlog/phase2-confirm-A2.jpg` (the Confirm screen for A2 in the local preview), queued for `velda-studio/buildlog/`.
+- Timing: Node trace of the 29 MP plan 1.3 s; whole in-page import of A2 in this sandbox about 70 s, most of it pdf.js on two cores; laptop timing unverified.
+
+Open:
+- Importing A2 in the signed-in Toolbelt page: unverified in Toolbelt (not signed in).
+- Two-level check with the DU set: pending (only A2 is attached). Done instead against the migrated v0.3 level 1 (above).
+- Not built yet: vector walls for fully vector PDFs (tier B), raster-only plans with the Replicate second opinion (tier C), diagonal walls, images of plans (refused with a message), dragging walls on the Confirm screen (Phase 3 brings the plan editor), and rescaling when a person says a size is wrong (the Fix answer is a note for now).
+- The `4'-5"` string at the walk-in closet does not land on the trace (listed on the Confirm screen); the closet's hall wall reads 3 in off from the v0.3 trace.
+
+Decisions N8 needs: none for Phase 2. Phase 3 starts by confirming the five-tool strip (09).
