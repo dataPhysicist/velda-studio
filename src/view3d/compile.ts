@@ -1,4 +1,4 @@
-// Compile a Studio model (inches, plan coordinates) into a Pascal scene graph (meters).
+// Compile model v2 (inches, plan coordinates) into a Pascal scene graph (meters).
 // Node ids are derived from model ids so the camera, selection and versions stay stable.
 
 import {
@@ -16,9 +16,10 @@ import {
   ZoneNode,
 } from '@pascal-app/core'
 import catalog from '../../scripts/catalog.json'
-import { type StudioItem, type StudioModel, type StudioRoom, type StudioWall, pointInPolygon, wallLength } from './model'
-import { type Role, type Theme, finishFor, slug } from './theme'
-import { IN } from './units'
+import { type Role, type Theme, finishFor, slug } from '../lib/theme'
+import { pointInPolygon, wallLength } from '../model/geom'
+import type { Item as StudioItem, Level, Model as StudioModel, Opening, Room as StudioRoom } from '../model/types'
+import { IN } from '../model/units'
 
 type AnyNode = Record<string, any>
 export type CompiledScene = {
@@ -90,10 +91,14 @@ export function compileScene(model: StudioModel): CompiledScene {
   site.children = []
   const building = add(BuildingNode.parse({ id: 'building_house', name: 'House', children: [] }), site)
   const levels = [...model.levels].sort((a, b) => a.elev - b.elev)
+  const levelById: Record<string, Level> = Object.fromEntries(levels.map((l) => [l.id, l]))
+  const ceilingOf = (levelId: string) => levelById[levelId]?.ceiling ?? levels[0]?.ceiling ?? 108
+  const openingsByWall = new Map<string, Opening[]>()
+  for (const o of model.openings) openingsByWall.set(o.wall, [...(openingsByWall.get(o.wall) ?? []), o])
   const levelNodes: Record<string, AnyNode> = {}
   levels.forEach((l, i) => {
     const next = levels[i + 1]
-    const height = (next ? next.elev - l.elev : model.ceiling + 12) * IN
+    const height = (next ? next.elev - l.elev : l.ceiling + l.floorThickness) * IN
     levelNodes[l.id] = add(
       LevelNode.parse({ id: `level_${l.id}`, name: l.name, level: i, height, children: [], metadata: { sid: l.id } }),
       building,
@@ -114,7 +119,7 @@ export function compileScene(model: StudioModel): CompiledScene {
         polygon: poly,
         color: '#c8b8a0',
         spaceRole: 'room',
-        ceilingHeight: model.ceiling * IN,
+        ceilingHeight: (r.ceiling ?? ceilingOf(r.level)) * IN,
         metadata: { sid: r.id, label: r.name },
       }),
       lv,
@@ -140,7 +145,7 @@ export function compileScene(model: StudioModel): CompiledScene {
         id: `ceiling_${r.id}`,
         name: `${r.name} ceiling`,
         polygon: r.polygon.map(([x, y]) => P(x, y)),
-        height: model.ceiling * IN,
+        height: (r.ceiling ?? ceilingOf(r.level)) * IN,
         children: [],
         metadata: { sid: r.id },
       }),
@@ -153,7 +158,8 @@ export function compileScene(model: StudioModel): CompiledScene {
     const lv = levelOf(w.level)
     const len = wallLength(w)
     if (len < 1) continue
-    const height = (w.h ?? model.ceiling) * IN
+    const wallH = w.h ?? ceilingOf(w.level)
+    const height = wallH * IN
     const glass = w.kind === 'glass'
     // Which side faces a room: lets the viewer's cut-away hide walls between you and the room.
     const ux = (w.b[0] - w.a[0]) / len
@@ -182,17 +188,19 @@ export function compileScene(model: StudioModel): CompiledScene {
       }),
       lv,
     )
-    for (const o of w.openings) {
+    for (const o of openingsByWall.get(w.id) ?? []) {
       const width = Math.min(o.w, len - 1) * IN
       const at = Math.min(Math.max(o.at, o.w / 2), len - o.w / 2) * IN
       if (o.kind === 'window') {
-        const h = Math.min(o.h, (w.h ?? model.ceiling) - (o.sill ?? 36) - 2) * IN
+        // v2 stores the head height; Pascal wants the glass height above the sill.
+        const sill = o.sill ?? 36
+        const h = Math.max(6, Math.min(o.h - sill, wallH - sill - 2)) * IN
         add(
           WindowNode.parse({
             id: `window_${o.id}`,
             name: 'Window',
             wallId: wall.id,
-            position: [at, (o.sill ?? 36) * IN + h / 2, 0],
+            position: [at, sill * IN + h / 2, 0],
             width,
             height: h,
             metadata: { sid: o.id, wall: w.id },
@@ -200,16 +208,17 @@ export function compileScene(model: StudioModel): CompiledScene {
           wall,
         )
       } else {
-        const h = Math.min(o.h, (w.h ?? model.ceiling) - 2) * IN
+        const h = Math.min(o.h, wallH - 2) * IN
+        const cased = o.kind === 'opening' || o.style === 'cased'
         add(
           DoorNode.parse({
             id: `door_${o.id}`,
-            name: o.kind === 'opening' ? 'Opening' : 'Door',
+            name: cased ? 'Opening' : 'Door',
             wallId: wall.id,
             position: [at, h / 2, 0],
             width,
             height: h,
-            openingKind: o.kind === 'opening' ? 'opening' : 'door',
+            openingKind: cased ? 'opening' : 'door',
             openingShape: o.shape === 'arch' ? 'arch' : 'rectangle',
             ...(o.style === 'french' || (o.style !== 'pocket' && o.w >= 60) ? { leafCount: 2 } : {}),
             // Doors stand open so the house reads (and walks) as connected rooms.
@@ -379,7 +388,7 @@ export function compileScene(model: StudioModel): CompiledScene {
           end: P(b[0], b[1]),
           thickness: Math.max(0.75, it.d) * IN,
           height: it.h * IN,
-          ...(it.kind === 'beam' ? { supportOffset: (it.z ?? model.ceiling - it.h) * IN } : {}),
+          ...(it.kind === 'beam' ? { supportOffset: (it.z ?? ceilingOf(it.level) - it.h) * IN } : {}),
           children: [],
           slots: { interior: mat, exterior: mat },
           metadata: { sid: it.id, label: it.label, kind: it.kind },
@@ -514,4 +523,3 @@ function stackFor(kind: string, it: StudioItem, carcass: number, key: string): a
   }
 }
 
-export type { StudioWall }

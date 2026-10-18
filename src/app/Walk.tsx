@@ -5,8 +5,9 @@ import { useViewer } from '@pascal-app/viewer'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import { Euler, Vector3 } from 'three'
-import { type StudioModel, pointInPolygon, polygonBounds, wallLength } from '../lib/model'
-import { IN } from '../lib/units'
+import { pointInPolygon, polygonBounds, wallLength } from '../model/geom'
+import type { Model as StudioModel } from '../model/types'
+import { IN } from '../model/units'
 import { useStudio } from './store'
 
 type Seg = { ax: number; az: number; bx: number; bz: number; r: number }
@@ -27,8 +28,8 @@ export function collisionSegments(model: StudioModel, levelId: string): Seg[] {
     if (len < 1) continue
     const ux = (w.b[0] - w.a[0]) / len
     const uy = (w.b[1] - w.a[1]) / len
-    const gaps = w.openings
-      .filter((o) => o.kind !== 'window' || (o.sill ?? 36) < 12)
+    const gaps = model.openings
+      .filter((o) => o.wall === w.id && (o.kind !== 'window' || (o.sill ?? 36) < 12))
       .map((o) => [o.at - o.w / 2, o.at + o.w / 2] as [number, number])
       .sort((p, q) => p[0] - q[0])
     let s = 0

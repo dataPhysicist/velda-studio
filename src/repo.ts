@@ -1,12 +1,30 @@
-// Persistence: schemes, versions (each holds a full Studio model), messages, saved themes.
-// Inside Toolbelt this is workspace DuckDB (velda_studio.duckdb); outside it, memory (local dev).
+// Persistence: schemes, versions (each holds a full model), messages, comments, saved themes.
+// Inside Toolbelt this is workspace DuckDB (velda_studio_dev.duckdb until 1.0); outside it, memory (local dev).
 
 import type { StudioModel } from './lib/model'
 import type { Theme } from './lib/theme'
+import type { Author, Comment, Model } from './model/types'
 import { DB, lit, type ToolbeltSDK } from './toolbelt'
 
-export type Scheme = { id: string; name: string; head_version: string | null; sort: number; created_at?: string }
-export type Version = { id: string; scheme_id: string; seq: number; summary: string; source: string; created_at?: string }
+/** Model rows this build writes. A build refuses to open a database written by a newer schema. */
+export const SCHEMA_VERSION = 2
+
+/** A version row holds either a v0.3 model (migrated on first open) or a v2 model. */
+export type StoredModel = Model | StudioModel
+
+export type Scheme = { id: string; name: string; head_version: string | null; sort: number; role?: 'asbuilt' | 'proposed' | null; created_at?: string }
+export type Version = {
+  id: string
+  scheme_id: string
+  seq: number
+  summary: string
+  source: string
+  parent_id?: string | null
+  author?: Author | null
+  ops_json?: string | null
+  label?: string | null
+  created_at?: string
+}
 export type Attachment = { path: string; name: string; type: string; preview?: string; role?: 'before' | 'after' }
 export type Message = {
   id: string
@@ -26,8 +44,10 @@ export interface Repo {
   saveScheme(s: Scheme): Promise<void>
   deleteScheme(id: string): Promise<void>
   versions(schemeId: string): Promise<Version[]>
-  model(versionId: string): Promise<StudioModel | null>
-  addVersion(v: Version, model: StudioModel): Promise<void>
+  model(versionId: string): Promise<StoredModel | null>
+  addVersion(v: Version, model: Model): Promise<void>
+  comments(schemeId: string): Promise<Comment[]>
+  saveComment(c: Comment): Promise<void>
   messages(schemeId: string): Promise<Message[]>
   addMessage(m: Message): Promise<void>
   themes(): Promise<Theme[]>
@@ -102,6 +122,14 @@ export class DuckRepo implements Repo {
     await this.q(
       `CREATE TABLE IF NOT EXISTS captures (id VARCHAR PRIMARY KEY, room_id VARCHAR, level VARCHAR, name VARCHAR, status VARCHAR, media VARCHAR, blob_id VARCHAR, analysis VARCHAR, transform VARCHAR, created_at TIMESTAMP DEFAULT now())`,
     )
+    // Model v2: who made each version, from what, and the operations that produced it.
+    for (const col of ['parent_id', 'author', 'ops_json', 'label']) await this.q(`ALTER TABLE versions ADD COLUMN IF NOT EXISTS ${col} VARCHAR`)
+    await this.q(`ALTER TABLE schemes ADD COLUMN IF NOT EXISTS role VARCHAR`)
+    await this.q(
+      `CREATE TABLE IF NOT EXISTS comments (id VARCHAR PRIMARY KEY, scheme_id VARCHAR, level VARCHAR, at_x DOUBLE, at_y DOUBLE, target VARCHAR, body VARCHAR, author VARCHAR, resolved BOOLEAN DEFAULT false, created_at TIMESTAMP DEFAULT now())`,
+    )
+    await this.q(`CREATE TABLE IF NOT EXISTS comment_replies (id VARCHAR PRIMARY KEY, comment_id VARCHAR, body VARCHAR, author VARCHAR, created_at TIMESTAMP DEFAULT now())`)
+    await checkSchema(this)
   }
   async saveBlob(b: BlobMeta, bytes: Uint8Array) {
     await this.q(`DELETE FROM blob_parts WHERE blob_id = ${lit(b.id)}`)
@@ -149,13 +177,13 @@ export class DuckRepo implements Repo {
     )
   }
   async schemes() {
-    const rows = await this.q(`SELECT id, name, head_version, sort, CAST(created_at AS VARCHAR) created_at FROM schemes ORDER BY sort, created_at`)
+    const rows = await this.q(`SELECT id, name, head_version, sort, role, CAST(created_at AS VARCHAR) created_at FROM schemes ORDER BY sort, created_at`)
     return rows.map((r) => ({ ...r, sort: Number(r.sort) })) as Scheme[]
   }
   async saveScheme(s: Scheme) {
     await this.q(
-      `INSERT INTO schemes (id, name, head_version, sort) VALUES (${lit(s.id)}, ${lit(s.name)}, ${lit(s.head_version)}, ${Number(s.sort) || 0})
-       ON CONFLICT (id) DO UPDATE SET name = excluded.name, head_version = excluded.head_version, sort = excluded.sort`,
+      `INSERT INTO schemes (id, name, head_version, sort, role) VALUES (${lit(s.id)}, ${lit(s.name)}, ${lit(s.head_version)}, ${Number(s.sort) || 0}, ${lit(s.role ?? null)})
+       ON CONFLICT (id) DO UPDATE SET name = excluded.name, head_version = excluded.head_version, sort = excluded.sort, role = excluded.role`,
     )
   }
   async deleteScheme(id: string) {
@@ -163,17 +191,29 @@ export class DuckRepo implements Repo {
   }
   async versions(schemeId: string) {
     const rows = await this.q(
-      `SELECT id, scheme_id, seq, summary, source, CAST(created_at AS VARCHAR) created_at FROM versions WHERE scheme_id = ${lit(schemeId)} ORDER BY seq`,
+      `SELECT id, scheme_id, seq, summary, source, parent_id, author, label, CAST(created_at AS VARCHAR) created_at FROM versions WHERE scheme_id = ${lit(schemeId)} ORDER BY seq`,
     )
     return rows.map((r) => ({ ...r, seq: Number(r.seq) })) as Version[]
   }
   async model(versionId: string) {
     const rows = await this.q(`SELECT model FROM versions WHERE id = ${lit(versionId)}`)
-    return rows.length ? parse<StudioModel | null>(rows[0].model, null) : null
+    return rows.length ? parse<StoredModel | null>(rows[0].model, null) : null
   }
-  async addVersion(v: Version, model: StudioModel) {
+  async addVersion(v: Version, model: Model) {
     await this.q(
-      `INSERT INTO versions (id, scheme_id, seq, summary, source, model) VALUES (${lit(v.id)}, ${lit(v.scheme_id)}, ${v.seq}, ${lit(v.summary)}, ${lit(v.source)}, ${json(model)})`,
+      `INSERT INTO versions (id, scheme_id, seq, summary, source, model, parent_id, author, ops_json, label) VALUES (${lit(v.id)}, ${lit(v.scheme_id)}, ${v.seq}, ${lit(v.summary)}, ${lit(v.source)}, ${json(model)}, ${lit(v.parent_id ?? null)}, ${lit(v.author ?? null)}, ${lit(v.ops_json ?? null)}, ${lit(v.label ?? null)})`,
+    )
+  }
+  async comments(schemeId: string) {
+    const rows = await this.q(
+      `SELECT id, scheme_id, level, at_x, at_y, target, body, author, resolved, CAST(created_at AS VARCHAR) created_at FROM comments WHERE scheme_id = ${lit(schemeId)} ORDER BY created_at`,
+    )
+    return rows.map((r) => ({ id: r.id, scheme_id: r.scheme_id, level: r.level, at: [Number(r.at_x), Number(r.at_y)], target: r.target ?? undefined, body: r.body, author: r.author, resolved: !!r.resolved, created_at: r.created_at })) as Comment[]
+  }
+  async saveComment(c: Comment) {
+    await this.q(
+      `INSERT INTO comments (id, scheme_id, level, at_x, at_y, target, body, author, resolved) VALUES (${lit(c.id)}, ${lit(c.scheme_id)}, ${lit(c.level)}, ${Number(c.at[0])}, ${Number(c.at[1])}, ${lit(c.target ?? null)}, ${lit(c.body)}, ${lit(c.author)}, ${c.resolved ? 'true' : 'false'})
+       ON CONFLICT (id) DO UPDATE SET body = excluded.body, resolved = excluded.resolved, target = excluded.target`,
     )
   }
   async messages(schemeId: string) {
@@ -211,7 +251,8 @@ export class DuckRepo implements Repo {
 export class MemoryRepo implements Repo {
   kind = 'memory' as const
   private s: Scheme[] = []
-  private v: (Version & { model: StudioModel })[] = []
+  private v: (Version & { model: StoredModel })[] = []
+  private c: Comment[] = []
   private msgs: Message[] = []
   private t: Theme[] = []
   private kv = new Map<string, string>()
@@ -232,8 +273,14 @@ export class MemoryRepo implements Repo {
     const r = this.v.find((x) => x.id === id)
     return r ? JSON.parse(JSON.stringify(r.model)) : null
   }
-  async addVersion(v: Version, model: StudioModel) {
+  async addVersion(v: Version, model: StoredModel) {
     this.v.push({ ...v, created_at: new Date().toISOString(), model: JSON.parse(JSON.stringify(model)) })
+  }
+  async comments(schemeId: string) {
+    return this.c.filter((x) => x.scheme_id === schemeId)
+  }
+  async saveComment(c: Comment) {
+    this.c = [...this.c.filter((x) => x.id !== c.id), c]
   }
   async messages(schemeId: string) {
     return this.msgs.filter((m) => m.scheme_id === schemeId)
@@ -270,4 +317,11 @@ export class MemoryRepo implements Repo {
   async saveCapture(c: Capture) {
     this.caps = [...this.caps.filter((x) => x.id !== c.id), { ...c, created_at: c.created_at ?? new Date().toISOString() }]
   }
+}
+
+/** Refuse to run against rows written by a newer build; record the schema this build writes. */
+async function checkSchema(repo: Repo) {
+  const found = Number((await repo.setting('schema_version')) ?? 0)
+  if (found > SCHEMA_VERSION) throw new Error(`This page is older than your saved data (data version ${found}, page version ${SCHEMA_VERSION}). Reload the page to get the current build.`)
+  if (found < SCHEMA_VERSION) await repo.setSetting('schema_version', String(SCHEMA_VERSION))
 }

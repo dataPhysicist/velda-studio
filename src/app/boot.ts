@@ -1,11 +1,12 @@
 // Startup: connect to Toolbelt, open storage, import from Velda 3D on first run, open a scheme.
 import { designsUnlimitedThemes, importFromVelda3D } from '../lib/import'
 import { modelFromVelda3D } from '../lib/model'
-import { sid } from '../lib/model'
+import { migrateV1 } from '../model/migrate'
+import { newId as sid } from '../model/ops'
 import { DuckRepo, MemoryRepo, type Repo } from '../repo'
 import { useViewer } from '@pascal-app/viewer'
 import { connect } from '../toolbelt'
-import { focusOn, openScheme, rerender, send, useStudio } from './store'
+import { focusOn, goToVersion, openScheme, rerender, send, useStudio } from './store'
 
 declare const __STUDIO_ASSET_BASE__: string
 
@@ -20,6 +21,8 @@ export async function boot() {
     store: useStudio,
     focusOn,
     send,
+    openScheme,
+    goToVersion,
     rerender,
     viewer: useViewer,
     // For checks from the console: capture math, actions and snapshots.
@@ -36,9 +39,9 @@ export async function boot() {
       for (const t of themes) await repo.saveTheme(t)
       let sort = 0
       for (const s of imported) {
-        const v = { id: sid('v'), scheme_id: s.id, seq: 1, summary: 'Imported from Velda 3D', source: 'import' }
-        await repo.addVersion(v, s.model)
-        await repo.saveScheme({ id: s.id, name: s.name, head_version: v.id, sort: sort++ })
+        const v = { id: sid('v'), scheme_id: s.id, seq: 1, summary: 'Imported from Velda 3D', source: 'import', author: 'import' as const, label: 'v1 Imported from Velda 3D' }
+        await repo.addVersion(v, migrateV1(s.model).model)
+        await repo.saveScheme({ id: s.id, name: s.name, head_version: v.id, sort: sort++, role: /^as-built/i.test(s.name) ? 'asbuilt' : 'proposed' })
       }
       schemes = await repo.schemes()
     }

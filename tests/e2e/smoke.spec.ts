@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 // The local preview opens on the memory store with the fixture house (level 1 from A4, level 2 from A2).
-test('the studio opens the local preview with both levels and draws the 3D view', async ({ page }) => {
+test('the studio opens the local preview on model v2 with both levels and draws the 3D view', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(String(e)))
   await page.goto('/')
@@ -16,6 +16,9 @@ test('the studio opens the local preview with both levels and draws the 3D view'
     const m = s.model
     return {
       repo: s.repo.kind,
+      v: m.v,
+      openings: m.openings.length,
+      ceilings: m.levels.map((l: any) => [l.ceiling, l.prov.ceiling.src]),
       levels: m.levels.map((l: any) => l.id),
       walls: m.walls.length,
       l2Walls: m.walls.filter((w: any) => w.level === 'L2').length,
@@ -24,6 +27,9 @@ test('the studio opens the local preview with both levels and draws the 3D view'
     }
   })
   expect(summary.repo).toBe('memory')
+  expect(summary.v).toBe(2) // the v0.3 fixture was migrated to model v2 on import
+  expect(summary.openings).toBeGreaterThan(30)
+  expect(summary.ceilings).toEqual([[114, 'default'], [114, 'default']]) // carried over, marked assumed
   expect(summary.levels).toEqual(['L1', 'L2'])
   expect(summary.walls).toBeGreaterThan(40)
   expect(summary.rooms).toBeGreaterThan(10)

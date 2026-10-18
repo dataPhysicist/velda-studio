@@ -1,12 +1,15 @@
 // App state and actions: schemes, versions, conversation, focus.
 import { create } from 'zustand'
 import { DEEP_MODEL, askVelda, buildPrompt, pickModel } from '../lib/agent'
-import { compileScene } from '../lib/compile'
-import { type StudioModel, clone, polygonBounds, sid } from '../lib/model'
-import { applyOps } from '../lib/ops'
 import type { Theme } from '../lib/theme'
-import { IN } from '../lib/units'
-import type { Attachment, Message, Repo, Scheme, Version } from '../repo'
+import { polygonBounds } from '../model/geom'
+import { isV1, migrateV1 } from '../model/migrate'
+import { type Op, applyOps, newId as sid } from '../model/ops'
+import type { Author, Model } from '../model/types'
+import { IN } from '../model/units'
+import { compileScene } from '../view3d/compile'
+import handChecked from '../../scripts/plan-openings/level2-asbuilt-walls.json'
+import type { Attachment, Message, Repo, Scheme, StoredModel, Version } from '../repo'
 import type { ToolbeltSDK } from '../toolbelt'
 import { useViewer } from '@pascal-app/viewer'
 import { type Focus, showScene } from './scene'
@@ -21,7 +24,7 @@ type State = {
   schemeId: string | null
   versions: Version[]
   headId: string | null
-  model: StudioModel | null
+  model: Model | null
   library: Theme[]
   messages: Message[]
   thinking: { model: string; started: number } | null
@@ -67,7 +70,9 @@ const get = useStudio.getState
 
 // ------------------------------------------------------------------ scene + focus
 
-function render(model: StudioModel) {
+const clone = <T,>(v: T): T => structuredClone(v)
+
+function render(model: Model) {
   showScene(compileScene(model))
   set((s) => ({ model, sceneKey: s.sceneKey + 1 }))
   void import('./actions').then((m) => m.loadAssets(model)).catch(() => {})
@@ -95,7 +100,8 @@ export function computeFocus(): Focus | null {
   }
   if (!pts.length) return null
   const b = polygonBounds(pts)
-  const top = lv ? elev + model.ceiling : levels.length ? levels[levels.length - 1].elev + model.ceiling : model.ceiling
+  const topLevel = levels[levels.length - 1]
+  const top = lv ? elev + lv.ceiling : topLevel ? topLevel.elev + topLevel.ceiling : 108
   return {
     key: `${roomId ?? ''}|${lvId ?? ''}|${view}|${Date.now()}`,
     levelId: lv ? `level_${lv.id}` : null,
@@ -145,10 +151,21 @@ export async function openScheme(id: string) {
     if (!scheme) throw new Error('No schemes yet')
     const versions = await repo.versions(scheme.id)
     const headId = scheme.head_version && versions.some((v) => v.id === scheme.head_version) ? scheme.head_version : versions[versions.length - 1]?.id
-    const model = headId ? await repo.model(headId) : null
+    const stored = headId ? await repo.model(headId) : null
     const messages = await repo.messages(scheme.id)
     await repo.setSetting('last_scheme', scheme.id)
     set({ schemes, schemeId: scheme.id, versions, headId: headId ?? null, messages, status: null })
+    let model = stored && !isV1(stored) ? (stored as Model) : null
+    if (stored && isV1(stored)) {
+      // First open of a v0.3 scheme: migrate once and save it as a new version; the old one stays.
+      set({ status: 'Updating this scheme to the new model' })
+      const { model: migrated, report } = migrateV1(stored, { handChecked: handCheckedWalls() })
+      console.info('[studio] migrated scheme', scheme.id, report)
+      if (scheme.role == null && /^as-built/i.test(scheme.name)) await repo.saveScheme({ ...scheme, role: 'asbuilt' })
+      await commitVersion(migrated, 'Updated to the new model (every wall and opening kept)', 'migration', { author: 'migration', parentId: headId ?? null, renderNow: false })
+      set({ status: null, schemes: await repo.schemes() })
+      model = migrated
+    }
     if (model) {
       render(model)
       // Keep the current room if the new scheme has one with the same name.
@@ -162,10 +179,26 @@ export async function openScheme(id: string) {
   }
 }
 
-export async function commitVersion(model: StudioModel, summary: string, source: string): Promise<Version> {
-  const { repo, schemeId, versions, schemes } = get()
+export async function commitVersion(
+  model: Model,
+  summary: string,
+  source: string,
+  opts: { author?: Author; ops?: Op[]; parentId?: string | null; renderNow?: boolean } = {},
+): Promise<Version> {
+  const { repo, schemeId, versions, schemes, headId } = get()
   if (!repo || !schemeId) throw new Error('No scheme open')
-  const v: Version = { id: sid('v'), scheme_id: schemeId, seq: (versions[versions.length - 1]?.seq ?? 0) + 1, summary, source }
+  const seq = (versions[versions.length - 1]?.seq ?? 0) + 1
+  const v: Version = {
+    id: sid('v'),
+    scheme_id: schemeId,
+    seq,
+    summary,
+    source,
+    parent_id: opts.parentId !== undefined ? opts.parentId : headId,
+    author: opts.author ?? (source === 'chat' ? 'ai' : 'user'),
+    ops_json: opts.ops?.length ? JSON.stringify(opts.ops) : null,
+    label: `v${seq} ${summary}`,
+  }
   await repo.addVersion(v, model)
   const scheme = schemes.find((s) => s.id === schemeId)!
   await repo.saveScheme({ ...scheme, head_version: v.id })
@@ -174,15 +207,31 @@ export async function commitVersion(model: StudioModel, summary: string, source:
     headId: v.id,
     schemes: schemes.map((s) => (s.id === schemeId ? { ...s, head_version: v.id } : s)),
   })
-  render(model)
+  if (opts.renderNow !== false) render(model)
   return v
+}
+
+/** The next version's label, so edits can carry it in their provenance before the version exists. */
+export function nextVersionLabel(summary: string) {
+  const { versions } = get()
+  return `v${(versions[versions.length - 1]?.seq ?? 0) + 1} ${summary}`
+}
+
+function handCheckedWalls() {
+  return (handChecked as unknown as { id: string; level: string; a: [number, number]; b: [number, number] }[]).map((w) => ({ id: w.id, level: w.level, a: w.a, b: w.b }))
+}
+
+/** A stored row as a v2 model (older rows are migrated in memory for viewing). */
+export function asModel(stored: StoredModel): Model {
+  return isV1(stored) ? migrateV1(stored, { handChecked: handCheckedWalls() }).model : (stored as Model)
 }
 
 export async function goToVersion(id: string) {
   const { repo, schemeId, schemes } = get()
   if (!repo || !schemeId) return
-  const model = await repo.model(id)
-  if (!model) return
+  const stored = await repo.model(id)
+  if (!stored) return
+  const model = asModel(stored)
   const scheme = schemes.find((s) => s.id === schemeId)!
   await repo.saveScheme({ ...scheme, head_version: id })
   set({ headId: id, schemes: schemes.map((s) => (s.id === schemeId ? { ...s, head_version: id } : s)) })
@@ -201,9 +250,10 @@ export async function newSchemeFromCurrent(name: string) {
   const { repo, model, schemes } = get()
   if (!repo || !model) return
   const id = sid('s')
-  const scheme: Scheme = { id, name, head_version: null, sort: (schemes[schemes.length - 1]?.sort ?? 0) + 1 }
+  const scheme: Scheme = { id, name, head_version: null, sort: (schemes[schemes.length - 1]?.sort ?? 0) + 1, role: 'proposed' }
   await repo.saveScheme(scheme)
-  const v: Version = { id: sid('v'), scheme_id: id, seq: 1, summary: `Copied from ${schemes.find((s) => s.id === get().schemeId)?.name ?? 'scheme'}`, source: 'copy' }
+  const summary = `Copied from ${schemes.find((s) => s.id === get().schemeId)?.name ?? 'scheme'}`
+  const v: Version = { id: sid('v'), scheme_id: id, seq: 1, summary, source: 'copy', parent_id: get().headId, author: 'user', label: `v1 ${summary}` }
   await repo.addVersion(v, clone(model))
   await repo.saveScheme({ ...scheme, head_version: v.id })
   await openScheme(id)
@@ -273,9 +323,18 @@ export async function send(text: string, attachments: Attachment[] = []) {
     const { splitOps, runActions } = await import('./actions')
     const { model: modelOps, actions } = splitOps(ans.ops)
     if (modelOps.length) {
-      const res = applyOps(get().model!, modelOps)
+      // Velda never edits the record of the house as it is today: design changes go to a new scheme.
+      const records = modelOps.every((o) => o.op === 'note' || o.op === 'field_dimension')
+      let branched = ''
+      if (isAsBuilt() && !records) {
+        branched = ans.summary || 'Option 1'
+        await newSchemeFromCurrent(uniqueSchemeName(branched))
+      }
+      const summary = ans.summary || 'Change from Velda'
+      const res = applyOps(get().model!, modelOps, { author: 'ai', versionLabel: nextVersionLabel(summary), focusLevel: room?.level ?? get().levelId })
+      if (branched) note += `\n\nI made this change in a new scheme, "${get().schemes.find((x) => x.id === get().schemeId)?.name}", so your as-built record stays as it is.`
       if (res.applied) {
-        const v = await commitVersion(res.model, ans.summary || 'Change from Velda', 'chat')
+        const v = await commitVersion(res.model, summary, 'chat', { author: 'ai', ops: modelOps })
         versionId = v.id
         // Save any theme Velda created or changed to the library for reuse.
         for (const t of Object.values(res.model.themes)) {
@@ -336,8 +395,8 @@ In reply, tell N8 in two or three sentences what you measured and changed, and a
     const { model: modelOps, actions } = splitOps(ans.ops)
     let versionId: string | null = null
     if (modelOps.length) {
-      const res = applyOps(get().model!, modelOps)
-      if (res.applied) versionId = (await commitVersion(res.model, ans.summary || `${opts.room.name} as captured`, 'capture')).id
+      const res = applyOps(get().model!, modelOps, { author: 'ai', versionLabel: nextVersionLabel(ans.summary || `${opts.room.name} as captured`) })
+      if (res.applied) versionId = (await commitVersion(res.model, ans.summary || `${opts.room.name} as captured`, 'capture', { author: 'ai', ops: modelOps })).id
     }
     if (actions.length) await runActions(actions)
     await addMessage({ role: 'assistant', body: ans.reply || `I measured the ${opts.room.name.toLowerCase()} and updated the model.`, version_id: versionId, chips: ['Show my photo remodeled with the theme', 'Walk through it'] })
@@ -378,9 +437,9 @@ async function verifyCapture(opts: { room: { id: string; name: string; level: st
     const { splitOps } = await import('./actions')
     const { model: modelOps } = splitOps(ans.ops)
     if (modelOps.length) {
-      const res = applyOps(get().model!, modelOps)
+      const res = applyOps(get().model!, modelOps, { author: 'ai', versionLabel: nextVersionLabel(ans.summary || `${opts.room.name} checked against photos`) })
       if (res.applied) {
-        const v = await commitVersion(res.model, ans.summary || `${opts.room.name} checked against photos`, 'verify')
+        const v = await commitVersion(res.model, ans.summary || `${opts.room.name} checked against photos`, 'verify', { author: 'ai', ops: modelOps })
         await addMessage({ role: 'assistant', body: ans.reply || 'I compared the model with your photos and fixed what was off.', version_id: v.id })
       }
     }
@@ -389,6 +448,19 @@ async function verifyCapture(opts: { room: { id: string; name: string; level: st
   } finally {
     set({ activity: null })
   }
+}
+
+/** The scheme that records the house as it is today. */
+export function isAsBuilt() {
+  const { schemes, schemeId } = get()
+  const s = schemes.find((x) => x.id === schemeId)
+  return !!s && (s.role === 'asbuilt' || (s.role == null && /^as-built/i.test(s.name)))
+}
+
+function uniqueSchemeName(base: string) {
+  const names = new Set(get().schemes.map((s) => s.name))
+  if (!names.has(base)) return base
+  for (let i = 2; ; i++) if (!names.has(`${base} ${i}`)) return `${base} ${i}`
 }
 
 export function isDeep(model: string) {

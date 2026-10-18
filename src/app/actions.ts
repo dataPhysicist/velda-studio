@@ -1,9 +1,10 @@
 // Things Velda can start that take longer than a model edit: measuring a room from photos or video,
 // photoreal renders, and turning a product photo into a 3D model. Each posts its own message.
 import { analyzeRoom, captureTransform, packCloud, parseCloud, planImage, thin, unpackCloud } from '../lib/capture'
-import { assetRegistry } from '../lib/compile'
-import { type StudioModel, clone, polygonBounds, sid } from '../lib/model'
-import type { Op } from '../lib/ops'
+import { polygonBounds } from '../model/geom'
+import { type Op, newId as sid } from '../model/ops'
+import type { Model as StudioModel } from '../model/types'
+import { assetRegistry } from '../view3d/compile'
 import { MODELS, outputUrls, runReplicate } from '../lib/replicate'
 import { finishFor, themeBrief } from '../lib/theme'
 import type { Attachment, Capture } from '../repo'
@@ -254,7 +255,7 @@ async function make3d(a: Op) {
   const blobId = sid('glb')
   await repo.saveBlob({ id: blobId, kind: 'glb', name: it.label, size: bytes.length, meta: bounds }, bytes)
   registerGlb(blobId, bytes, bounds)
-  const next = clone(get().model!)
+  const next = structuredClone(get().model!)
   const target = next.items.find((i) => i.id === it.id)
   if (!target) return
   target.kind = 'item'

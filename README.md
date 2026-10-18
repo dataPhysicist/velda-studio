@@ -6,10 +6,10 @@ Built on the MIT-licensed [Pascal editor](https://github.com/pascalorg/editor) p
 
 ## How it works
 
-- **The Studio model** (`src/lib/model.ts`) is the source of truth: levels, walls with doors and windows, rooms, fixtures and cabinet runs, and the themes the scheme uses, all in inches in the plan frame (x right, y down the sheet). It is small (about 20 KB) and every version stores a full copy.
-- **Compile** (`src/lib/compile.ts`) turns the model into a Pascal scene in meters. Cabinet runs become Pascal modular cabinets, and a sink, range, cooktop or dishwasher inside a run's footprint becomes a module of that run. Theme roles (walls, trim, cabinets, island, counters, floors, accent, metal) become Pascal materials, per room where a room has its own theme.
+- **The model** (`src/model/`, v2) is the source of truth: levels, sheets, walls, doors and windows, rooms, fixtures, stairs, the drawing's dimension strings and the themes the scheme uses, all in inches in the plan frame (x right, y down the sheet). Every number carries where it came from (measured, traced, assumed, set by Velda). Every change goes through `src/model/ops.ts`, which enforces the rules (walls stay connected, openings stay in their walls, rooms are worked out from the walls, only a person can say a wall carries no load). v0.3 schemes (`src/lib/model.ts`, v1) are migrated on first open (`src/model/migrate.ts`). Every version stores a full copy.
+- **Compile** (`src/view3d/compile.ts`) turns the model into a Pascal scene in meters. Cabinet runs become Pascal modular cabinets, and a sink, range, cooktop or dishwasher inside a run's footprint becomes a module of that run. Theme roles (walls, trim, cabinets, island, counters, floors, accent, metal) become Pascal materials, per room where a room has its own theme.
 - **Velda** (`src/lib/agent.ts`): each message goes to a Velda sub-chat on Claude (Sonnet 4.6 for edits, Opus 5.5 for design questions and photos) with a compact description of the model. Velda answers with a short reply plus JSON operations (`src/lib/ops.ts`), which are applied to the model and saved as a new version. Photos are uploaded to `velda-studio/uploads/` and Velda opens them itself.
-- **Storage** (`src/repo.ts`): workspace DuckDB `velda_studio.duckdb`, tables `schemes`, `versions` (model JSON), `messages`, `themes` (saved for reuse), `settings`. Queries run one at a time with retries.
+- **Storage** (`src/repo.ts`): workspace DuckDB, tables `schemes`, `versions` (model JSON, who made it and the operations), `messages`, `comments`, `themes` (saved for reuse), `settings`, `blobs`. Development builds use `velda_studio_dev.duckdb`; only the 1.0 release uses `velda_studio.duckdb`. Queries run one at a time with retries.
 - **First run** (`src/lib/import.ts`): each Velda 3D scheme is imported with its plan walls (`apps/velda-3d/data/geo_*.json`, merged into clean wall lines by `src/lib/plan-walls.ts`, which also finds room outlines from the room labels), fixtures and themes. The Designs Unlimited color plan direction (7.6.26) is seeded as two themes, with its inspiration images in `assets/themes/`.
 - **Textures**: Pascal 1.0.3's material library points at `*_512.ktx2` files, but many bundled textures are JPG or WebP. `scripts/material-remap.json` (built by `scripts/material-remap.mjs`) points each missing file at the one that exists; `src/main.tsx` applies it at startup.
 
@@ -43,6 +43,9 @@ If GitHub cannot be reached within 2.5 s it loads the `FALLBACK` commit written 
 
     npm install
     npm run dev
+    npm run check   # types, unit tests, browser tests (see docs/build-log.md)
+
+The 1.0 rebuild is tracked in `docs/build-log.md`.
 
 ## Licenses
 

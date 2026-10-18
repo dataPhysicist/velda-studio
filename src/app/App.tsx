@@ -375,7 +375,7 @@ function Welcome() {
           <strong>Paste a link</strong> to a sofa, vanity, light or tile. Velda reads its size and builds it in the space as a 3D model.
         </li>
         <li>
-          <strong>Add photos or a short video</strong> of a room as it is today, slowly walking it. Velda measures it, rebuilds it in the model, and can show your own photo remodeled.
+          <strong>Add a photo</strong> of a room as it is today. Velda can show your own photo remodeled.
         </li>
       </ul>
       <p className="muted small">Every change is saved as a version, so you can always step back.</p>
@@ -652,7 +652,7 @@ const Composer = ({ ref }: { ref: React.RefObject<ComposerApi | null> }) => {
       />
       <div className="composer-row">
         <button type="button" className="link" onClick={() => file.current?.click()}>
-          Add photos or video
+          Add photos
         </button>
         <input
           ref={file}

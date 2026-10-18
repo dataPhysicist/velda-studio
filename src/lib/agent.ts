@@ -1,8 +1,8 @@
 // Velda: turns what the person says (and any photos) into a reply plus model operations.
 import type { Attachment, Message } from '../repo'
 import type { ToolbeltSDK } from '../toolbelt'
-import type { StudioModel } from './model'
-import type { Op } from './ops'
+import type { Op } from '../model/ops'
+import type { Model as StudioModel } from '../model/types'
 import { describeModel } from './summary'
 import { LIBRARY_FINISHES, ROLES } from './theme'
 
@@ -58,18 +58,18 @@ OPERATIONS (inches, plan coordinates; ids exactly as listed; you may give new th
   KIND: base_cabinet, island, vanity (cabinet runs; a sink, range, cooktop or dishwasher placed inside a run's footprint becomes part of it), sink, range, cooktop, dishwasher, fridge, oven_tower, tall_cabinet, wall_cabinet (z = bottom height, default 54), hood, tub, shower, toilet, bench, glass (glass panel: w long, d thick, h tall), beam (ceiling beam: z = bottom height), item (furniture from the catalog: ${CATALOG_HINT}).
 - {"op":"update_item","id":ITEM,"label"?,"kind"?,"catalog"?,"props"?}
 - {"op":"add_wall","id"?,"level":"L1","a":[x,y],"b":[x,y],"t":4.5,"h"?,"kind"?:"glass"|"half"} / {"op":"update_wall","id":WALL,"a"?,"b"?,"t"?,"h"?,"kind"?}
-- {"op":"add_opening","wall":WALL,"kind":"door"|"window"|"opening","at"?:inches from wall start to center OR "x","y" a point on the wall,"w":..,"h"?,"sill"?,"shape"?:"arch","style"?:"swing"|"pocket"|"sliding"|"french"} / {"op":"update_opening","id":OPENING,...}
+- {"op":"add_opening","wall":WALL,"kind":"door"|"window"|"opening","at"?:inches from wall start to center OR "x","y" a point on the wall,"w":..,"h"?:head height above the floor (doors 80, windows 84),"sill"?:windows only,"shape"?:"arch","style"?:"swing"|"pocket"|"sliding"|"french"|"bifold"|"barn"|"casement"|"double_hung"|"slider"|"fixed","hinge"?:"a"|"b","side"?:"left"|"right"} / {"op":"update_opening","id":OPENING,...}
 - {"op":"room","id":ROOM,"rename"?:"...","theme"?:THEME|null}
 - {"op":"theme","id"?:THEME to edit (omit to create),"name"?,"description"?,"scope"?,"palette"?:[{"name","hex","role","use"}],"materials"?:[{"category","choice"}],"avoid"?:[...],"finishes"?:{ROLE:{"color":"#hex"} or {"library":ID}},"images"?:[{"path"}],"apply_to"?:"house"|ROOM name or id|[...]}
   Roles: ${ROLES.join(', ')}. Library finishes: ${lib}.
-- {"op":"house_theme","theme":THEME} / {"op":"ceiling","h":114} / {"op":"note","text":"..."}
+- {"op":"house_theme","theme":THEME} / {"op":"set_level","id":LEVEL,"ceiling"?:inches,"floorThickness"?:inches} / {"op":"note","text":"..."}
 Actions (these start longer jobs after your reply; say in your reply that you started them):
-- {"op":"capture","room":ROOM,"media":[every photo path of the existing room]} measures a room from N8's photos or video frames (3D reconstruction), then you rebuild that room to match. Use it when N8 sends photos or a video of a room as it is now, not inspiration.
-- {"op":"capture_align","room":ROOM,"quarter":0|1|2|3} turns a captured room's points by quarter turns to line up with the plan.
 - {"op":"render","from":"view" or a photo path,"room":ROOM,"prompt":"what the design looks like, finishes, light","refs"?:[image paths or URLs],"quality"?:"best"} makes a photorealistic image: "view" renders the current 3D view; a photo path paints the design into N8's own photo of the room. Use it for "show me realistically", "what would my bathroom look like", etc. When N8 has sent photos of the room in this conversation, prefer his photo.
 - {"op":"make_3d","id":ITEM,"image":image URL or path} builds a real 3D model of a product from its photo and puts it in the item's place. Use it after add_item for a product link or product photo.
 
 PRODUCTS: when N8 pastes a link to furniture, a fixture or a finish, read the page and find the product name, overall width, depth and height, color or material, and the main product image URL (an https image URL, not the page URL). Then add_item it at its real size where it makes sense (or where N8 says), with "label" as the product name and "props":{"url":PAGE,"image":IMAGE URL,"price":...}, and follow with make_3d for that item using the image. For a pasted product photo, do the same with its storage path as the image. For a finish (tile, paint, counter), update the theme instead.
+
+ACCURACY: never present an assumed number as measured; a ceiling or window height marked assumed is a guess until N8 confirms it. STRUCTURE: never set a wall's bearing to "no"; removing, opening or moving a wall that may carry load always gets "an engineer must confirm".
 
 DESIGN RULES: Put fixtures inside their room, backs against the wall face (wall centerline offset by t/2 + d/2), facing into the room. Base cabinets 24" deep x 36" high; tall 84" to 96"; uppers 12" to 13" deep with bottoms at 54". Kitchen aisles 42" (48" for two cooks); 36" clear in front of a toilet and 15" from its center to a side wall; 30" x 48" clear in front of fixtures. Changing colors or materials means a theme op (house theme or a room's theme); a room-specific look should get its own theme applied to that room. When you remove or widen an opening in a wall that may be load-bearing, say an engineer must confirm the header. Plans are design intent; field measurements govern.
 
@@ -90,7 +90,7 @@ function toolRules(text: string, attachments: Attachment[]) {
   if (attachments.length) {
     lines.push(
       `ATTACHMENTS: open each file with read_storage_file (fileName exactly as given) and look at it before answering.\n${attachments.map((a) => `- ${a.path} (${a.name}, ${a.type})`).join('\n')}`,
-      `Decide what each photo is. Inspiration (a room, a finish, a color board): capture it as a theme op with exact hex colors sampled from the photo (palette with roles ${ROLES.join(', ')}), the materials and a short description, include images:[{"path":"<file>"}], and apply it to the room N8 names (or the focused room). A product: add_item at its real size and make_3d from the photo. Photos or video frames of N8's own room as it is today: start a capture op for that room with all of those paths (ask which room only if you truly cannot tell). A plan or drawing: describe it and ask what to do with it.`,
+      `Decide what each photo is. Inspiration (a room, a finish, a color board): capture it as a theme op with exact hex colors sampled from the photo (palette with roles ${ROLES.join(', ')}), the materials and a short description, include images:[{"path":"<file>"}], and apply it to the room N8 names (or the focused room). A product: add_item at its real size and make_3d from the photo. Photos of N8's own room as it is today: describe what you see and offer a realistic render of it remodeled (render with that photo). A plan or drawing: describe it and ask what to do with it.`,
     )
   }
   if (links.length) lines.push(`LINKS: open each link with your web page reading tool (crawling, or web search if the page will not load) before answering: ${links.join(' ')}`)
