@@ -42,6 +42,9 @@ const blobUrls: Plugin = {
 
 export default defineConfig({
   base: './',
+  // The dev server serves Pascal's editor sources unbundled; howler is CommonJS and must be
+  // pre-bundled or the page stops on "does not provide an export named 'Howl'" (the build is fine).
+  optimizeDeps: { include: ['howler'] },
   publicDir: cdn ? false : 'assets',
   plugins: [assetPaths, blobUrls, react(), tailwindcss()],
   resolve: {
