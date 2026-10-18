@@ -167,7 +167,24 @@ export class ToolbeltSDK {
   }
 }
 
-export const DB = 'velda_studio.duckdb'
+declare const __STUDIO_DB__: string
+
+/** N8's real schemes. Only the 1.0 release points here; until then builds use the test copy. */
+export const LIVE_DB = 'velda_studio.duckdb'
+/** Test copy used by development releases, so the build never touches the real schemes. */
+export const DEV_DB = 'velda_studio_dev.duckdb'
+
+/** The workspace database this page uses: `?db=<name>.duckdb` on the page URL wins, else the build's default. */
+export function resolveDb(search?: string, buildDefault?: string): string {
+  const fallback = buildDefault ?? (typeof __STUDIO_DB__ === 'string' && __STUDIO_DB__ ? __STUDIO_DB__ : DEV_DB)
+  try {
+    const q = new URLSearchParams(search ?? window.location.search).get('db')
+    if (q && /^[a-z0-9_]{1,64}\.duckdb$/.test(q)) return q
+  } catch {}
+  return fallback
+}
+
+export const DB = resolveDb()
 export const V3D_DB = 'velda3d.duckdb'
 export const lit = (v: unknown) => (v === null || v === undefined ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`)
 

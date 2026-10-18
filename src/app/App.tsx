@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { finishFor, ROLES, swatches, type Theme } from '../lib/theme'
 import type { Attachment, Message } from '../repo'
+import { DB, LIVE_DB } from '../toolbelt'
 import { Stage } from './Stage'
 import { enterWalk, exitWalk, focusOn, goToVersion, isDeep, newSchemeFromCurrent, openScheme, send, stepVersion, uploadAttachment, uploadVideo, useStudio } from './store'
 
@@ -99,6 +100,7 @@ function TitleBlock() {
         >
           {copying ? 'Saving…' : 'Save as a new scheme'}
         </button>
+        <TestDataNote />
       </div>
       <h1 className="room-title">{room?.name ?? (levelId ? model?.levels.find((l) => l.id === levelId)?.name : 'Whole house')}</h1>
       <nav className="levels" aria-label="Level">
@@ -126,6 +128,17 @@ function TitleBlock() {
         ))}
       </nav>
     </header>
+  )
+}
+
+/** Development builds save to a separate test database; say so, so nobody mistakes it for the real schemes. */
+function TestDataNote() {
+  const inToolbelt = useStudio((s) => !!s.sdk)
+  if (!inToolbelt || DB === LIVE_DB) return null
+  return (
+    <span className="test-data" title={`This build saves to ${DB}. Your real schemes are not changed.`}>
+      Test copy: your real schemes are not changed
+    </span>
   )
 }
 

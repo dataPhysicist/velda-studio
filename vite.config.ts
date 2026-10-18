@@ -15,6 +15,10 @@ const REPO = process.env.STUDIO_REPO ?? 'dataPhysicist/velda-studio'
 const cdn = process.env.STUDIO_CDN === '1'
 const ASSET_REF = process.env.STUDIO_ASSET_REF ?? `v${pkg.version}`
 const ASSET_BASE = cdn ? `https://cdn.jsdelivr.net/gh/${REPO}@${ASSET_REF}/assets` : '.'
+// Workspace database the build saves to. Development releases use the test copy so N8's real
+// schemes are untouched; the 1.0 release sets STUDIO_DB=velda_studio.duckdb. A page URL can still
+// override it with ?db=<name>.duckdb.
+const STUDIO_DB = process.env.STUDIO_DB ?? 'velda_studio_dev.duckdb'
 
 // Pascal references its static assets with root-absolute paths ("/icons/wall.webp").
 // The app is not served from a domain root, so point those at ASSET_BASE instead.
@@ -61,6 +65,7 @@ export default defineConfig({
     'process.env': '{}',
     __STUDIO_ASSET_BASE__: JSON.stringify(ASSET_BASE),
     __STUDIO_VERSION__: JSON.stringify(pkg.version),
+    __STUDIO_DB__: JSON.stringify(STUDIO_DB),
   },
   build: {
     target: 'esnext',
