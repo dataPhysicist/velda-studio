@@ -24,6 +24,8 @@ export async function boot() {
     viewer: useViewer,
     // For checks from the console: capture math, actions and snapshots.
     lib: () => Promise.all([import('../lib/capture'), import('./actions'), import('./ViewerExtras')]).then(([capture, actions, extras]) => ({ capture, actions, extras })),
+    // Platform checks (workers, pdf.js) for the browser tests and the console.
+    platform: () => import('../platform/check'),
   }
   try {
     await repo.init()
@@ -45,6 +47,8 @@ export async function boot() {
     const first = schemes.find((s) => s.id === last) ?? schemes.find((s) => s.id === 'n8-kitchen') ?? schemes[0]
     await openScheme(first.id)
     void import('./actions').then((m) => m.loadCaptures()).catch((e) => console.warn('[studio] captures not loaded', e))
+    // Platform checks run only when asked for in the database (settings platform_check = 'run').
+    if (sdk) void import('../platform/check').then((m) => m.maybeRunPlatformCheck(sdk, repo)).catch((e) => console.warn('[studio] platform check failed', e))
   } catch (e) {
     console.error('[studio] boot failed', e)
     set({ status: null, error: `Velda Studio could not start: ${(e as Error).message || e}` })

@@ -55,6 +55,12 @@ export class ToolbeltSDK {
     return tools.find((n) => n === bare) ?? tools.find((n) => n.endsWith('_' + bare) || n.endsWith('__' + bare)) ?? bare
   }
 
+  /** Every tool name the bridge exposes to this page. */
+  async listToolNames(): Promise<string[]> {
+    await this.toolName('read_storage_file')
+    return [...(this.tools ?? [])]
+  }
+
   async runTool(bare: string, args: Record<string, unknown> = {}) {
     return this.sendRequest('TOOLBELT_RUN_TOOL', { tool: await this.toolName(bare), arguments: args })
   }
