@@ -64,6 +64,10 @@ Where Playwright's Chromium download is blocked (this build sandbox), set `PW_CH
 - 2026-10-19 Layout per 06 section 1: Conversation on the left (360 px), the plan or 3D in the middle, the Selection panel on the right (320 px, can be hidden). The large room title stays over the canvas; the plan starts below it. The Checks, Inspiration and Versions tabs come with their phases; the version strip stays along the bottom.
 - 2026-10-19 The 3D view stops drawing while the plan covers it (the viewer's `renderPaused`); the scene still updates, so 3D is current when it shows again. In this sandbox the plan went from 600 ms a frame to 16 ms.
 - 2026-10-19 The plan draws a room's clear dimensions for sides of 30 in or more (jogs and returns read as clutter); the Selection panel lists them with their badges. Small fixtures draw over counters so they can be picked; a room name steps off an island.
+- 2026-10-19 Door swings in 3D: in a Pascal wall's own frame, x runs from the wall's start to its end and +z is the right-hand side of start to end (y down the sheet). A leaf the model swings to the left of start to end is Pascal's "outward"; the hinge end maps to hingesSide (start = left). Doors stand open about 70 degrees so the leaf shows the swing. Checked from above in the local preview and pinned by `tests/view3d/compile.test.ts`.
+- 2026-10-19 Stairs compile as one straight Pascal flight from the bottom step along the plan's up arrow. When only the upper floor is in the model (an A2 import), the flight hangs below that floor with a rise of its ceiling plus floor structure.
+- 2026-10-19 3D view options live in one "Walls:" button over the 3D view (walls cut away, full, see-through, off; floors: the one picked, all, spread apart; light: even, morning sun, afternoon sun). The sun presets put a light where the sun is at 10 am and 4 pm on an equinox at 30.5 degrees north, turned by the plan's north setting (top of the sheet until a person sets it), over the viewer's soft overcast light. The usual 3D view looks down at 35 degrees.
+- 2026-10-19 3D clicks: one click reaches every node under the cursor, nearest first, each bubbling to its level, building and site; the first that is a wall, opening, room floor, fixture or stair is selected. The plan's selection is shown in 3D through the viewer's host highlight (`externalSelectedIds`).
 
 ## 2026-10-18  Phase 0  commit eaa8f33 (dev release, build 5f119ff)
 
@@ -160,3 +164,28 @@ Open:
 Decisions N8 needs: none for Phase 3.
 
 Next: Phase 4, 3D parity: compile v2 with openings, swings, stairs, wall kinds and per-room themes; cut-away modes; stacked and solo levels; selection shared between 3D and the plan; framing; lighting presets; Walk regression check. Then the gate review with N8.
+
+## 2026-10-19  Phase 4  commits 150ecf5 to PENDING (dev release, build PENDING)
+
+Done:
+- 3D from model v2 (`src/view3d/compile.ts`): doors stand open the way the plan swings them (hinge end and side), with sliding, pocket, barn, folding, pair and garage doors drawn as what they are; windows take their type; stairs become a straight flight; half walls (3'-6") and rails (3'-0") stop short of the ceiling; a room's own color scheme reaches its walls where every room the wall faces shares it.
+- Shared selection (`src/app/Stage.tsx`): a click on a wall, door, window, fixture, stair or floor in 3D selects it in the plan and the Selection panel; Shift adds; whatever is selected in the plan lights up in 3D; double-clicking a floor frames that room.
+- 3D view options over the 3D view: walls cut away (the default N8 likes), full, see-through or off; floors: the one picked (solo when a level is picked, all when "Whole house" is), all stacked, spread apart; light: even, morning sun, afternoon sun (`src/view3d/sun.ts`). The usual view looks down at 35 degrees.
+
+Evidence:
+- `npm run check` green: 60 unit tests in 8 files (new `tests/view3d/compile.test.ts`, 7: every wall, opening and room has a 3D node carrying its model id; door swings both ways; sliding, pocket, pair and cased; half walls and rails; a stair from its bottom step up the plan's arrow; a room's color on its own walls only; the sun's direction at 10 am and 4 pm turned by north), 7 browser tests.
+- `tests/e2e/editor.spec.ts` now checks the 3D scene after every edit in the Phase 3 test (the moved wall and its stretched neighbors, the new door, both flips, the delete, both undos, the joined room): each one is in the 3D scene graph by the time the version is saved, the same frame the plan shows it.
+- `tests/e2e/view3d.spec.ts`: with walls full in 3D it stands in the Primary Bedroom, looks at a wall and clicks it; the plan's selection is that wall, the Selection panel shows it, 3D highlights it, and the plan has it selected after pressing 1. Then Walk through in the Primary Bathroom starts inside the room and W moves you at eye height; Esc leaves.
+- Screenshots (local preview, level 2, software rendering): `docs/buildlog/phase4-walls-cutaway.jpg`, `-up.jpg`, `-translucent.jpg`, `-down.jpg`, and `phase4-floors-apart-morning-sun.jpg` (whole house, floors spread apart, morning sun, with the options open).
+- Dev release: PENDING. CI: PENDING.
+
+Open:
+- The signed-in Toolbelt page: unverified in Toolbelt. Everything from Phase 1 on waits for one signed-in open: the migration of N8's real schemes on the test copy, the armed platform checks, the A2 import in the page, the build log screenshots copied to `velda-studio/buildlog/`, and seeing 3D on a real GPU. The 09 gate's "verify by eye in the signed-in page" is N8's to do at the gate review.
+- In this sandbox 3D draws through SwiftShader: Pascal builds wall geometry a few walls per frame, so all 116 walls take about 70 s and Walk moves a few centimeters a second. Laptop speed unverified.
+- Both faces of a wall share one finish in Pascal, so a room's own color does not reach walls it shares with a room on another scheme.
+- The usual 3D framing is close for "spread apart" floors on the whole house.
+- Stairs exist only on imported sheets (the migrated v0.3 levels have none).
+
+Decisions N8 needs: the Phase 4 gate review (go for Phase 5, or what to fix first).
+
+Next: wait for N8's go. Phase 5 is Velda's operations contract and the checker (07).

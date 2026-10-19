@@ -131,14 +131,14 @@ test('3D: a wall clicked in 3D is selected in the plan; the wall modes; Walk in 
     return inside(p[0] / IN, p[2] / IN)
   }, { timeout: 60_000 }).toBe(true)
   const before = await cam()
-  // SwiftShader draws a frame or two a second here and each step is clamped, so allow a short walk.
+  // SwiftShader draws a frame or two a second here (fewer once every wall is built) and each step is
+  // clamped, so hold W until the eye has moved a little.
   await page.keyboard.down('w')
-  await page.waitForTimeout(4000)
-  await page.keyboard.up('w')
   await expect.poll(async () => {
     const p = await cam()
     return Math.hypot(p[0] - before[0], p[2] - before[2])
-  }, { timeout: 30_000 }).toBeGreaterThan(0.05)
+  }, { timeout: 90_000, intervals: [2000] }).toBeGreaterThan(0.05)
+  await page.keyboard.up('w')
   const after = await cam()
   expect(Math.abs(after[1] - before[1])).toBeLessThan(0.05) // eye height holds
   await page.keyboard.press('Escape')
