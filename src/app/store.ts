@@ -5,7 +5,7 @@ import type { Theme } from '../lib/theme'
 import { polygonBounds } from '../model/geom'
 import { isV1, migrateV1 } from '../model/migrate'
 import { type Op, applyOps, newId as sid } from '../model/ops'
-import type { Author, Model } from '../model/types'
+import type { Author, Comment, Model } from '../model/types'
 import { IN } from '../model/units'
 import { compileScene } from '../view3d/compile'
 import handChecked from '../../scripts/plan-openings/level2-asbuilt-walls.json'
@@ -38,7 +38,15 @@ type State = {
   activity: { text: string; started: number } | null // long jobs: capture, renders, 3D models
   clouds: { id: string; level: string; pos: Float32Array; col: Uint8Array; transform: number[] }[]
   showCaptures: boolean
+  /** What is selected, shared by the plan, the 3D view and the context panel. */
+  selection: { kind: SelKind; id: string }[]
+  tool: Tool
+  /** Comment pins on the current scheme (the Comment tool). */
+  comments: Comment[]
 }
+
+export type SelKind = 'wall' | 'opening' | 'room' | 'item' | 'stair' | 'dimension' | 'comment'
+export type Tool = 'select' | 'wall' | 'opening' | 'measure' | 'comment'
 
 export const useStudio = create<State>(() => ({
   sdk: null,
@@ -63,6 +71,9 @@ export const useStudio = create<State>(() => ({
   activity: null,
   clouds: [],
   showCaptures: true,
+  selection: [],
+  tool: 'select',
+  comments: [],
 }))
 
 const set = useStudio.setState
@@ -153,8 +164,9 @@ export async function openScheme(id: string) {
     const headId = scheme.head_version && versions.some((v) => v.id === scheme.head_version) ? scheme.head_version : versions[versions.length - 1]?.id
     const stored = headId ? await repo.model(headId) : null
     const messages = await repo.messages(scheme.id)
+    const comments = await repo.comments(scheme.id).catch(() => [])
     await repo.setSetting('last_scheme', scheme.id)
-    set({ schemes, schemeId: scheme.id, versions, headId: headId ?? null, messages, status: null })
+    set({ schemes, schemeId: scheme.id, versions, headId: headId ?? null, messages, comments, selection: [], status: null })
     let model = stored && !isV1(stored) ? (stored as Model) : null
     if (stored && isV1(stored)) {
       // First open of a v0.3 scheme: migrate once and save it as a new version; the old one stays.

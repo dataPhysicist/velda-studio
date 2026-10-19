@@ -59,6 +59,9 @@ export function Stage() {
   const focus = useStudio((s) => s.focus)
   const sceneKey = useStudio((s) => s.sceneKey)
   const walking = useStudio((s) => !!s.walk)
+  // The plan covers the 3D view; stop drawing it meanwhile (the scene still updates, so 3D is current
+  // the moment it shows again).
+  const covered = useStudio((s) => s.view === 'plan' && !s.walk)
   useEffect(() => {
     const v = useViewer.getState()
     v.setWallMode('cutaway')
@@ -79,7 +82,7 @@ export function Stage() {
   }, [focus?.levelId])
   return (
     <div className="stage-canvas">
-      <Viewer selectionManager="custom" renderContext="viewer" sceneReadyKey={sceneKey} maxFps={walking ? 60 : 50}>
+      <Viewer selectionManager="custom" renderContext="viewer" sceneReadyKey={sceneKey} maxFps={walking ? 60 : 50} renderPaused={covered}>
         {walking ? <WalkControls /> : <Controls />}
         <Snapshotter />
         <CaptureLayer />

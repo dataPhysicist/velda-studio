@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { finishFor, ROLES, swatches, type Theme } from '../lib/theme'
 import type { Attachment, Message } from '../repo'
 import { DB, LIVE_DB } from '../toolbelt'
+import { Plan } from '../plan2d/Plan'
+import { ContextPanel } from './Context'
+import { cancelConfirm, redo, undo, useEditor } from './editor'
 import { ImportFlow } from './Import'
 import { startImport, useImport } from './importFlow'
 import { Stage } from './Stage'
@@ -17,10 +20,26 @@ export function App() {
   const composer = useRef<ComposerApi>(null)
   // The import covers the studio; drop the 3D view meanwhile so the trace has the machine to itself.
   const importing = useImport((s) => s.stage !== 'idle')
+  const view = useStudio((s) => s.view)
+  const walking = useStudio((s) => !!s.walk)
+  const [ctxOpen, setCtxOpen] = useState(() => {
+    try {
+      return localStorage.getItem('velda.ctx') !== 'closed'
+    } catch {
+      return true
+    }
+  })
+  const showCtx = (open: boolean) => {
+    setCtxOpen(open)
+    try {
+      localStorage.setItem('velda.ctx', open ? 'open' : 'closed')
+    } catch {}
+  }
+  useGlobalKeys()
 
   return (
     <div
-      className={`studio${drag ? ' is-dragging' : ''}`}
+      className={`studio${drag ? ' is-dragging' : ''}${ctxOpen ? '' : ' ctx-closed'}`}
       onDragOver={(e) => {
         if ([...e.dataTransfer.types].includes('Files')) {
           e.preventDefault()
@@ -39,8 +58,10 @@ export function App() {
         else if (files.length) composer.current?.add(files)
       }}
     >
-      <main className="stage-pane">
+      <Conversation composerRef={composer} />
+      <main className={`stage-pane${view === 'plan' && !walking ? ' is-plan' : ''}`}>
         {!importing && <Stage />}
+        {!importing && view === 'plan' && !walking && model && <Plan />}
         <TitleBlock />
         <div className="stage-foot">
           <div className="foot-left">
@@ -57,8 +78,15 @@ export function App() {
           </div>
         )}
         {drag && <div className="drop-hint">Drop photos to show Velda, or a plan PDF to bring it in</div>}
+        <EditorOverlay />
       </main>
-      <Conversation composerRef={composer} />
+      {ctxOpen ? (
+        <ContextPanel onHide={() => showCtx(false)} />
+      ) : (
+        <button type="button" className="ctx-tab" onClick={() => showCtx(true)}>
+          Selection
+        </button>
+      )}
       <ImportFlow />
     </div>
   )
@@ -187,30 +215,87 @@ function ViewSwitch() {
   const walking = useStudio((s) => !!s.walk)
   return (
     <div className="view-switch" role="group" aria-label="View">
-      <button
-        type="button"
-        aria-pressed={!walking && view === '3d'}
-        onClick={() => {
-          exitWalk()
-          focusOn({ view: '3d' })
-        }}
-      >
-        3D
-      </button>
-      <button
-        type="button"
-        aria-pressed={!walking && view === 'plan'}
-        onClick={() => {
-          exitWalk()
-          focusOn({ view: 'plan' })
-        }}
-      >
+      <button type="button" aria-pressed={!walking && view === 'plan'} title="Plan (1)" onClick={() => showView('plan')}>
         Plan
       </button>
-      <button type="button" aria-pressed={walking} onClick={() => (walking ? exitWalk() : enterWalk())}>
+      <button type="button" aria-pressed={!walking && view === '3d'} title="3D (2)" onClick={() => showView('3d')}>
+        3D
+      </button>
+      <button type="button" aria-pressed={walking} title="Walk through (3)" onClick={() => (walking ? exitWalk() : enterWalk())}>
         Walk through
       </button>
     </div>
+  )
+}
+
+function showView(view: 'plan' | '3d') {
+  exitWalk()
+  focusOn({ view })
+}
+
+/** Keys that work in every view (06 section 11); the plan adds its own tool keys. */
+function useGlobalKeys() {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (useEditor.getState().confirm) {
+        if (e.key === 'Escape') cancelConfirm()
+        return
+      }
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return
+      if (useImport.getState().stage !== 'idle' || !useStudio.getState().model) return
+      const mod = e.metaKey || e.ctrlKey
+      if (mod && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) redo()
+        else undo()
+        return
+      }
+      if (mod || e.altKey) return
+      if (e.key === '1') showView('plan')
+      else if (e.key === '2') showView('3d')
+      else if (e.key === '3') enterWalk()
+      else if (e.key === '/') {
+        e.preventDefault()
+        ;(document.querySelector('.composer textarea') as HTMLTextAreaElement | null)?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+}
+
+/** The editor's two voices: a short notice after an edit, and the confirm before a risky one. */
+function EditorOverlay() {
+  const notice = useEditor((s) => s.notice)
+  const confirm = useEditor((s) => s.confirm)
+  const first = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (confirm) first.current?.focus()
+  }, [confirm])
+  return (
+    <>
+      {notice && !confirm && (
+        <div className="notice" role="status">
+          {notice}
+        </div>
+      )}
+      {confirm && (
+        <div className="confirm-veil" onPointerDown={(e) => e.target === e.currentTarget && cancelConfirm()}>
+          <div className="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-body">
+            <h2 id="confirm-title">{confirm.title}</h2>
+            <p id="confirm-body">{confirm.body}</p>
+            <div className="confirm-row">
+              {confirm.choices.map((c, i) => (
+                <button key={c.label} ref={i === 0 ? first : undefined} type="button" className={c.primary ? 'btn primary' : c.label === 'Cancel' ? 'link' : 'btn'} onClick={c.run}>
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
