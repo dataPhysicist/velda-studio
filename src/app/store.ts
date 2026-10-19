@@ -43,6 +43,14 @@ type State = {
   tool: Tool
   /** Comment pins on the current scheme (the Comment tool). */
   comments: Comment[]
+  /** How the 3D view shows the house (06 section 3). */
+  look: Look
+}
+
+export type Look = {
+  walls: 'cutaway' | 'up' | 'translucent' | 'down' // cut away, full, see-through, none
+  levels: 'auto' | 'stacked' | 'solo' | 'exploded' // auto: the picked level alone, else all stacked
+  light: 'studio' | 'morning' | 'afternoon'
 }
 
 export type SelKind = 'wall' | 'opening' | 'room' | 'item' | 'stair' | 'dimension' | 'comment'
@@ -74,6 +82,7 @@ export const useStudio = create<State>(() => ({
   selection: [],
   tool: 'select',
   comments: [],
+  look: { walls: 'cutaway', levels: 'auto', light: 'studio' },
 }))
 
 const set = useStudio.setState

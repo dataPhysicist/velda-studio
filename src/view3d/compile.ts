@@ -11,6 +11,8 @@ import {
   LevelNode,
   SiteNode,
   SlabNode,
+  StairNode,
+  StairSegmentNode,
   WallNode,
   WindowNode,
   ZoneNode,
@@ -18,7 +20,7 @@ import {
 import catalog from '../../scripts/catalog.json'
 import { type Role, type Theme, finishFor, slug } from '../lib/theme'
 import { pointInPolygon, wallLength } from '../model/geom'
-import type { Item as StudioItem, Level, Model as StudioModel, Opening, Room as StudioRoom } from '../model/types'
+import type { Item as StudioItem, Level, Model as StudioModel, Opening, Room as StudioRoom, Stair, Wall } from '../model/types'
 import { IN } from '../model/units'
 
 type AnyNode = Record<string, any>
@@ -158,7 +160,8 @@ export function compileScene(model: StudioModel): CompiledScene {
     const lv = levelOf(w.level)
     const len = wallLength(w)
     if (len < 1) continue
-    const wallH = w.h ?? ceilingOf(w.level)
+    // Half walls and rails stop short of the ceiling unless the person set a height.
+    const wallH = w.h ?? (w.kind === 'half' ? 42 : w.kind === 'rail' ? 36 : ceilingOf(w.level))
     const height = wallH * IN
     const glass = w.kind === 'glass'
     // Which side faces a room: lets the viewer's cut-away hide walls between you and the room.
@@ -171,17 +174,23 @@ export function compileScene(model: StudioModel): CompiledScene {
       model.rooms.some((r) => r.level === w.level && pointInPolygon([mx + sx * off, my + sy * off], r.polygon)) ? 'interior' : 'exterior'
     const frontSide = side(-uy, ux)
     const backSide = side(uy, -ux)
-    const wallRef = glass ? 'library:preset-glass' : ref(houseTheme, 'walls')
+    // Both faces of a wall share its interior finish, so a room's own theme colors a wall only
+    // when every room it faces has that theme (or it is an outside wall of that room).
+    const faced = [roomAt(w.level, mx - uy * off, my + ux * off), roomAt(w.level, mx + uy * off, my - ux * off)].filter(Boolean) as StudioRoom[]
+    const themesFaced = [...new Set(faced.map((r) => r.theme ?? null))]
+    const inner = themesFaced.length === 1 && themesFaced[0] && themes[themesFaced[0]] ? themes[themesFaced[0]] : houseTheme
+    const wallRef = glass ? 'library:preset-glass' : ref(inner, 'walls')
+    const outerRef = glass ? wallRef : ref(houseTheme, 'walls')
     const wall = add(
       WallNode.parse({
         id: `wall_${w.id}`,
         name: glass ? 'Glass partition' : 'Wall',
         start: P(w.a[0], w.a[1]),
         end: P(w.b[0], w.b[1]),
-        thickness: Math.max(0.5, w.t) * IN,
+        thickness: Math.max(w.kind === 'rail' ? 2 : 0.5, w.t) * IN,
         height,
         children: [],
-        slots: { interior: wallRef, exterior: wallRef },
+        slots: { interior: wallRef, exterior: outerRef },
         frontSide,
         backSide,
         metadata: { sid: w.id },
@@ -203,6 +212,8 @@ export function compileScene(model: StudioModel): CompiledScene {
             position: [at, sill * IN + h / 2, 0],
             width,
             height: h,
+            windowType: WINDOW_TYPE[o.style] ?? 'fixed',
+            openingShape: o.shape === 'arch' ? 'arch' : 'rectangle',
             metadata: { sid: o.id, wall: w.id },
           }),
           wall,
@@ -210,26 +221,13 @@ export function compileScene(model: StudioModel): CompiledScene {
       } else {
         const h = Math.min(o.h, wallH - 2) * IN
         const cased = o.kind === 'opening' || o.style === 'cased'
-        add(
-          DoorNode.parse({
-            id: `door_${o.id}`,
-            name: cased ? 'Opening' : 'Door',
-            wallId: wall.id,
-            position: [at, h / 2, 0],
-            width,
-            height: h,
-            openingKind: cased ? 'opening' : 'door',
-            openingShape: o.shape === 'arch' ? 'arch' : 'rectangle',
-            ...(o.style === 'french' || (o.style !== 'pocket' && o.w >= 60) ? { leafCount: 2 } : {}),
-            // Doors stand open so the house reads (and walks) as connected rooms.
-            operationState: o.style === 'sliding' || o.style === 'pocket' ? 0.85 : 0.75,
-            metadata: { sid: o.id, wall: w.id },
-          }),
-          wall,
-        )
+        add(DoorNode.parse({ id: `door_${o.id}`, name: cased ? 'Opening' : o.kind === 'garage' ? 'Garage door' : 'Door', wallId: wall.id, position: [at, h / 2, 0], width, height: h, ...doorShape(o, cased), metadata: { sid: o.id, wall: w.id } }), wall)
       }
     }
   }
+
+  // Stairs: one straight flight from the level it rises from to the next, along its up direction.
+  for (const st of model.stairs ?? []) buildStair(st)
 
   // Items: cabinet runs with their appliances, then stand-alone fixtures.
   const runKinds = new Set(['base_cabinet', 'island', 'vanity'])
@@ -248,6 +246,66 @@ export function compileScene(model: StudioModel): CompiledScene {
   }
 
   return { nodes, rootNodeIds: [site.id], materials }
+
+  function roomAt(level: string, x: number, y: number) {
+    return model.rooms.find((r) => r.level === level && r.polygon.length >= 3 && pointInPolygon([x, y], r.polygon))
+  }
+
+  // ---------------------------------------------------------------- stairs
+
+  function buildStair(st: Stair) {
+    if (st.polygon.length < 3) return
+    const from = levelById[st.level]
+    const to = levelById[st.toLevel]
+    if (!from && !to) return
+    // Rise: floor to floor when both levels are in the model; otherwise the upper level's own
+    // ceiling plus floor structure (a single upper floor: the flight comes up from below it).
+    const rise = from && to ? to.elev - from.elev : (from ?? to)!.ceiling + (from ?? to)!.floorThickness
+    const host = from ? levelOf(from.id) : levelOf(to!.id)
+    const baseY = from ? 0 : -rise * IN
+    const u = st.up
+    const xs = st.polygon.map((p) => p[0])
+    const ys = st.polygon.map((p) => p[1])
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2
+    const cy = (Math.min(...ys) + Math.max(...ys)) / 2
+    const along = Math.abs(u[0]) > Math.abs(u[1]) ? Math.max(...xs) - Math.min(...xs) : Math.max(...ys) - Math.min(...ys)
+    const across = Math.abs(u[0]) > Math.abs(u[1]) ? Math.max(...ys) - Math.min(...ys) : Math.max(...xs) - Math.min(...xs)
+    const risers = st.risers ?? Math.max(2, Math.round(rise / 7.5))
+    // Pascal builds a flight along its local +z from the bottom step; the node sits at the bottom.
+    const start: [number, number] = [cx - (u[0] * along) / 2, cy - (u[1] * along) / 2]
+    const stair = add(
+      StairNode.parse({
+        id: `stair_${st.id}`,
+        name: 'Stair',
+        position: [start[0] * IN, baseY, start[1] * IN],
+        rotation: Math.atan2(u[0], u[1]),
+        stairType: 'straight',
+        fromLevelId: from ? `level_${from.id}` : null,
+        toLevelId: to ? `level_${to.id}` : null,
+        width: across * IN,
+        totalRise: rise * IN,
+        stepCount: risers,
+        railingMode: 'right',
+        children: [],
+        metadata: { sid: st.id },
+      }),
+      host,
+    )
+    add(
+      StairSegmentNode.parse({
+        id: `sseg_${st.id}`,
+        name: 'Flight',
+        segmentType: 'stair',
+        width: across * IN,
+        length: along * IN,
+        height: rise * IN,
+        stepCount: risers,
+        fillToFloor: true,
+        metadata: { sid: st.id },
+      }),
+      stair,
+    )
+  }
 
   // ---------------------------------------------------------------- runs
 
@@ -449,6 +507,36 @@ export function compileScene(model: StudioModel): CompiledScene {
 }
 
 // ---------------------------------------------------------------- helpers
+
+const WINDOW_TYPE: Record<string, string> = { double_hung: 'double-hung', casement: 'casement', slider: 'sliding', fixed: 'fixed' }
+
+/**
+ * Pascal's door for an opening. In a wall's own frame x runs from its start to its end and +z is the
+ * right-hand side of start to end (y down the sheet), so a leaf swinging into the left side of the
+ * model's wall swings "outward" in Pascal's terms. Doors stand open so the house reads, and walks,
+ * as connected rooms; the leaf shows which way each one swings.
+ */
+export function doorShape(o: Opening, cased: boolean): Record<string, unknown> {
+  if (cased) return { openingKind: 'opening', openingShape: o.shape === 'arch' ? 'arch' : 'rectangle' }
+  const base = { openingKind: 'door', openingShape: o.shape === 'arch' ? 'arch' : 'rectangle' }
+  if (o.kind === 'garage') return { ...base, doorCategory: 'garage', doorType: 'garage-sectional', operationState: 0 }
+  const swing = o.swing ?? { hinge: 'a', side: 'left' }
+  const hinge = { hingesSide: swing.hinge === 'b' ? 'right' : 'left', swingDirection: swing.side === 'right' ? 'inward' : 'outward' }
+  switch (o.style) {
+    case 'sliding':
+      return { ...base, doorType: 'sliding', operationState: 0.5, slideDirection: swing.hinge === 'b' ? 'right' : 'left' }
+    case 'pocket':
+      return { ...base, doorType: 'pocket', operationState: 0.85 }
+    case 'barn':
+      return { ...base, doorType: 'barn', operationState: 0.85 }
+    case 'bifold':
+      return { ...base, doorType: 'folding', leafCount: o.w >= 48 ? 4 : 2, operationState: 0.6 }
+    case 'french':
+      return { ...base, ...hinge, doorType: 'french', leafCount: 2, swingAngle: 1.2 }
+    default:
+      return { ...base, ...hinge, doorType: o.w >= 60 ? 'double' : 'hinged', ...(o.w >= 60 ? { leafCount: 2 } : {}), swingAngle: 1.2 }
+  }
+}
 
 function contains(run: StudioItem, a: StudioItem) {
   const yaw = run.rot * RAD

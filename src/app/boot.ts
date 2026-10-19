@@ -4,6 +4,7 @@ import { modelFromVelda3D } from '../lib/model'
 import { migrateV1 } from '../model/migrate'
 import { newId as sid } from '../model/ops'
 import { DuckRepo, MemoryRepo, type Repo } from '../repo'
+import { sceneRegistry, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
 import { connect } from '../toolbelt'
 import { focusOn, goToVersion, openScheme, rerender, send, useStudio } from './store'
@@ -25,6 +26,9 @@ export async function boot() {
     goToVersion,
     rerender,
     viewer: useViewer,
+    // The 3D scene graph the viewer draws (for checks that an edit reached 3D).
+    scene: useScene,
+    registry: sceneRegistry,
     // For checks from the console: capture math, actions and snapshots.
     lib: () => Promise.all([import('../lib/capture'), import('./actions'), import('./ViewerExtras')]).then(([capture, actions, extras]) => ({ capture, actions, extras })),
     // Platform checks (workers, pdf.js) for the browser tests and the console.

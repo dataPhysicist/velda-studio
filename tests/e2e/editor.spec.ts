@@ -17,6 +17,36 @@ type Pick = {
 
 const state = (page: Page) => page.evaluate(() => (window as any).__studio.store.getState())
 const versions = (page: Page) => page.evaluate(() => (window as any).__studio.store.getState().versions.length as number)
+/**
+ * The 3D scene graph against the model (Phase 4 gate: every hand edit shows in 3D within a frame).
+ * Returns what does not match: walls where they are, every opening and room present, nothing left over.
+ */
+const sceneMismatches = (page: Page) =>
+  page.evaluate(() => {
+    const IN = 0.0254
+    const st = (window as any).__studio
+    const m = st.store.getState().model
+    const nodes = st.scene.getState().nodes
+    const out: string[] = []
+    const near = (p: number[], q: number[]) => Math.abs(p[0] - q[0] * IN) < 1e-6 && Math.abs(p[1] - q[1] * IN) < 1e-6
+    for (const w of m.walls) {
+      const n = nodes[`wall_${w.id}`]
+      if (Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) < 1) continue
+      if (!n) out.push(`no 3D wall ${w.id}`)
+      else if (!near(n.start, w.a) || !near(n.end, w.b)) out.push(`3D wall ${w.id} not where the plan has it`)
+    }
+    for (const o of m.openings) if (!nodes[`door_${o.id}`] && !nodes[`window_${o.id}`]) out.push(`no 3D opening ${o.id}`)
+    for (const r of m.rooms) if (!nodes[`zone_${r.id}`]) out.push(`no 3D room ${r.id}`)
+    const wallIds = new Set(m.walls.map((w: any) => `wall_${w.id}`))
+    const openIds = new Set(m.openings.flatMap((o: any) => [`door_${o.id}`, `window_${o.id}`]))
+    for (const id of Object.keys(nodes)) {
+      if (id.startsWith('wall_') && !id.startsWith('wall_item_') && !wallIds.has(id)) out.push(`3D wall ${id} left over`)
+      if ((id.startsWith('door_') || id.startsWith('window_')) && !openIds.has(id)) out.push(`3D opening ${id} left over`)
+    }
+    return out
+  })
+const doorNode = (page: Page, id: string) => page.evaluate((i) => (window as any).__studio.scene.getState().nodes[`door_${i}`] ?? null, id)
+
 const toScreen = (page: Page, p: V) => page.evaluate((q) => (window as any).__plan.toScreen(q) as V, p)
 
 /** An interior wall on level 2 with a derived room on each side, perpendicular walls at both ends, and room for a door. */
@@ -143,6 +173,7 @@ test('the plan editor: drag a wall 12 in, add a door, flip it, delete it, undo t
   expect(after.b - p.b.across).toBeCloseTo(12, 1)
   p.corners.forEach((c, i) => expect(Math.abs(after.corners[i] - c.length)).toBeCloseTo(12, 1)) // neighbors stretched
   expect(after.note).toBe(true) // the engineer note stays with the plan
+  expect(await sceneMismatches(page)).toEqual([]) // and 3D has the moved wall and its stretched neighbors
 
   // Add a door with the Opening tool: click on the wall.
   await page.keyboard.press('o')
@@ -162,22 +193,30 @@ test('the plan editor: drag a wall 12 in, add a door, flip it, delete it, undo t
   })
   expect(door).toMatchObject({ wall: p.wall, kind: 'door', w: 32, swing: { hinge: 'a', side: 'left' } })
   expect((await state(page)).tool).toBe('select')
+  expect(await sceneMismatches(page)).toEqual([])
+  expect(await doorNode(page, door.id)).toMatchObject({ hingesSide: 'left', swingDirection: 'outward' })
 
   // Flip the hinge (Space) and the side it swings into (Shift-Space).
   const swing = () => page.evaluate((id) => (window as any).__studio.store.getState().model.openings.find((o: any) => o.id === id)?.swing ?? null, door.id)
   await page.keyboard.press('Space')
   await expect.poll(swing).toEqual({ hinge: 'b', side: 'left' })
+  expect(await doorNode(page, door.id)).toMatchObject({ hingesSide: 'right', swingDirection: 'outward' })
   await page.keyboard.press('Shift+Space')
   await expect.poll(swing).toEqual({ hinge: 'b', side: 'right' })
+  expect(await doorNode(page, door.id)).toMatchObject({ hingesSide: 'right', swingDirection: 'inward' })
 
   // Delete it, then undo twice: the door is back with the hinge flipped and the side as it was.
   await page.keyboard.press('Delete')
   await expect.poll(swing).toBeNull()
   expect(await versions(page)).toBe(v0 + 5)
+  expect(await doorNode(page, door.id)).toBeNull()
+  expect(await sceneMismatches(page)).toEqual([])
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(swing).toEqual({ hinge: 'b', side: 'right' })
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(swing).toEqual({ hinge: 'b', side: 'left' })
+  expect(await doorNode(page, door.id)).toMatchObject({ hingesSide: 'right', swingDirection: 'outward' })
+  expect(await sceneMismatches(page)).toEqual([])
   const head = await page.evaluate(() => {
     const s = (window as any).__studio.store.getState()
     return s.versions.find((v: any) => v.id === s.headId).summary
@@ -206,6 +245,7 @@ test('the plan editor: drag a wall 12 in, add a door, flip it, delete it, undo t
   await expect
     .poll(() => page.evaluate(({ a, b }) => (window as any).__studio.store.getState().model.rooms.filter((r: any) => r.id === a || r.id === b).map((r: any) => r.name), { a: p.a.id, b: p.b.id }))
     .toEqual([p.b.name])
+  expect(await sceneMismatches(page)).toEqual([]) // the joined room is one room in 3D too
 
   await page.evaluate((id) => (window as any).__plan.frameRoom(id), p.b.id)
   await page.evaluate((id) => (window as any).__studio.store.setState({ roomId: id, selection: [{ kind: 'room', id }] }), p.b.id)

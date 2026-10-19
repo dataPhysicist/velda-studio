@@ -8,7 +8,7 @@ import { cancelConfirm, redo, undo, useEditor } from './editor'
 import { ImportFlow } from './Import'
 import { startImport, useImport } from './importFlow'
 import { Stage } from './Stage'
-import { enterWalk, exitWalk, focusOn, goToVersion, isDeep, newSchemeFromCurrent, openScheme, send, stepVersion, uploadAttachment, uploadVideo, useStudio } from './store'
+import { type Look, enterWalk, exitWalk, focusOn, goToVersion, isDeep, newSchemeFromCurrent, openScheme, send, stepVersion, uploadAttachment, uploadVideo, useStudio } from './store'
 
 declare const __STUDIO_ASSET_BASE__: string
 
@@ -66,6 +66,7 @@ export function App() {
         <div className="stage-foot">
           <div className="foot-left">
             <ViewSwitch />
+            <LookMenu />
             <CaptureToggle />
           </div>
           <ThemeStrip />
@@ -224,6 +225,60 @@ function ViewSwitch() {
       <button type="button" aria-pressed={walking} title="Walk through (3)" onClick={() => (walking ? exitWalk() : enterWalk())}>
         Walk through
       </button>
+    </div>
+  )
+}
+
+const WALLS: [Look['walls'], string][] = [
+  ['cutaway', 'Cut away'],
+  ['up', 'Full'],
+  ['translucent', 'See-through'],
+  ['down', 'Off'],
+]
+const LEVELS: [Look['levels'], string][] = [
+  ['auto', 'The one picked'],
+  ['stacked', 'All'],
+  ['exploded', 'Spread apart'],
+]
+const LIGHTS: [Look['light'], string][] = [
+  ['studio', 'Even'],
+  ['morning', 'Morning sun'],
+  ['afternoon', 'Afternoon sun'],
+]
+
+/** How the 3D view shows the house: walls, floors, light (06 section 3). Words, not icons. */
+function LookMenu() {
+  const view = useStudio((s) => s.view)
+  const walking = useStudio((s) => !!s.walk)
+  const look = useStudio((s) => s.look)
+  const [open, setOpen] = useState(false)
+  if (view !== '3d' || walking) return null
+  const setLook = (patch: Partial<Look>) => useStudio.setState({ look: { ...look, ...patch } })
+  const group = <K extends keyof Look>(key: K, label: string, options: [Look[K], string][]) => (
+    <div className="look-row" role="group" aria-label={label}>
+      <span className="look-label">{label}</span>
+      <span className="seg">
+        {options.map(([v, words]) => (
+          <button key={v} type="button" aria-pressed={look[key] === v} onClick={() => setLook({ [key]: v } as Partial<Look>)}>
+            {words}
+          </button>
+        ))}
+      </span>
+    </div>
+  )
+  return (
+    <div className="look">
+      <button type="button" className="toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+        Walls: {WALLS.find(([v]) => v === look.walls)?.[1]}
+      </button>
+      {open && (
+        <div className="look-pop" role="dialog" aria-label="How the 3D view shows the house">
+          {group('walls', 'Walls', WALLS)}
+          {group('levels', 'Floors', LEVELS)}
+          {group('light', 'Light', LIGHTS)}
+          {look.light !== 'studio' && <p className="muted small">Sun on an equinox day; north is {useStudio.getState().model?.project.north == null ? 'taken as the top of the plan until you set it' : 'as you set it'}.</p>}
+        </div>
+      )}
     </div>
   )
 }
