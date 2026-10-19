@@ -207,6 +207,9 @@ test('the plan editor: drag a wall 12 in, add a door, flip it, delete it, undo t
     .poll(() => page.evaluate(({ a, b }) => (window as any).__studio.store.getState().model.rooms.filter((r: any) => r.id === a || r.id === b).map((r: any) => r.name), { a: p.a.id, b: p.b.id }))
     .toEqual([p.b.name])
 
-  await page.screenshot({ path: 'test-results/editor-smoke.png' })
+  await page.evaluate((id) => (window as any).__plan.frameRoom(id), p.b.id)
+  await page.evaluate((id) => (window as any).__studio.store.setState({ roomId: id, selection: [{ kind: 'room', id }] }), p.b.id)
+  await expect(page.locator('.notice')).toHaveCount(0, { timeout: 10_000 })
+  await page.screenshot({ path: `${process.env.BUILDLOG ? 'docs/buildlog' : 'test-results'}/phase3-editor-joined-rooms.jpg`, type: 'jpeg', quality: 80 })
   expect(errors).toEqual([])
 })

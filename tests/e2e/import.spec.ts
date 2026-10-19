@@ -50,6 +50,7 @@ test('a plan PDF comes in through the Confirm screen and A2 passes every hard ch
   await expect(page.getByTestId('plan')).toBeVisible()
   await expect(page.locator('.plan image.underlay')).toHaveCount(1)
   await expect(page.locator('.plan .room-name').filter({ hasText: 'Primary Bedroom' })).toHaveCount(1)
-  await page.screenshot({ path: 'test-results/import-plan.png' })
+  await expect(page.locator('.notice')).toHaveCount(0, { timeout: 10_000 })
+  await page.screenshot({ path: `${process.env.BUILDLOG ? 'docs/buildlog' : 'test-results'}/phase3-plan-after-import.jpg`, type: 'jpeg', quality: 80 })
   expect(errors).toEqual([])
 })

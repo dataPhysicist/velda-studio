@@ -14,6 +14,15 @@ const toScreen = (page: Page, p: V) => page.evaluate((q) => (window as any).__pl
 const item = (page: Page, id: string) => page.evaluate((i) => (window as any).__studio.store.getState().model.items.find((x: any) => x.id === i), id)
 const versions = (page: Page) => page.evaluate(() => (window as any).__studio.store.getState().versions.length as number)
 
+/** A screenshot once the last message has faded, so it shows the plan and not the toast. */
+let inShots = 0 // time spent waiting for screenshots, left out of the timing
+async function shot(page: Page, name: string) {
+  const t = Date.now()
+  await expect(page.locator('.notice')).toHaveCount(0, { timeout: 10_000 })
+  await page.screenshot({ path: `${SHOTS}/${name}`, quality: 80, type: 'jpeg' })
+  inShots += Date.now() - t
+}
+
 async function drag(page: Page, from: V, to: V, steps = 10) {
   const a = await toScreen(page, from)
   const b = await toScreen(page, to)
@@ -31,7 +40,7 @@ async function click(page: Page, p: V, modifiers: ('Shift' | 'Alt')[] = []) {
 /** Wait for the version count to reach n (each hand edit saves one). */
 const settled = (page: Page, n: number) => expect.poll(() => versions(page)).toBe(n)
 
-test.use({ video: process.env.BUILDLOG ? 'on' : 'off' })
+test.use({ video: process.env.VIDEO ? 'on' : 'off' }) // needs Playwright's ffmpeg
 
 test('the three kitchen changes by hand in the plan, in under five minutes', async ({ page }) => {
   test.setTimeout(420_000)
@@ -54,9 +63,10 @@ test('the three kitchen changes by hand in the plan, in under five minutes', asy
     await ed.handEdit([{ op: 'move', id: 'n8-sink', x: 286, y, rot: 0 }], 'Put the sink back on the sink wall (test setup)')
   }, start.y)
   let v = await versions(page)
-  await page.screenshot({ path: `${SHOTS}/phase3-kitchen-0-before.jpg`, quality: 80, type: 'jpeg' })
+  await shot(page, 'phase3-kitchen-0-before.jpg')
 
   const t0 = Date.now()
+  inShots = 0
 
   // 1. The sink to the island: drag it onto the island, turn it to face the range side.
   const island = await item(page, 'n8-island')
@@ -69,7 +79,7 @@ test('the three kitchen changes by hand in the plan, in under five minutes', asy
   const sink = await item(page, 'n8-sink')
   expect(Math.abs(sink.x - island.x)).toBeLessThan(3)
   expect(sink.rot).toBe(180)
-  await page.screenshot({ path: `${SHOTS}/phase3-kitchen-1-sink.jpg`, quality: 80, type: 'jpeg' })
+  await shot(page, 'phase3-kitchen-1-sink.jpg')
 
   // 2. Patio doors on the sink wall: drag a 6 ft opening along the wall with the Opening tool (it
   // takes the window's place), make it a sliding door, then shorten the counter so the doors open.
@@ -98,7 +108,7 @@ test('the three kitchen changes by hand in the plan, in under five minutes', asy
   const moved = await item(page, 'n8-counter-sink')
   expect(moved.w).toBe(54)
   expect(moved.x + moved.w / 2).toBeLessThanOrEqual(wall.a[0] + 56 + 1) // clear of the doors
-  await page.screenshot({ path: `${SHOTS}/phase3-kitchen-2-patio-doors.jpg`, quality: 80, type: 'jpeg' })
+  await shot(page, 'phase3-kitchen-2-patio-doors.jpg')
 
   // 3. Swap the range and the refrigerator tower: select both columns, turn them to face the room
   // from the range wall, and slide them onto it; then the range goes where the tower was.
@@ -122,7 +132,7 @@ test('the three kitchen changes by hand in the plan, in under five minutes', asy
   await settled(page, ++v)
   await page.keyboard.press('r')
   await settled(page, ++v)
-  const elapsed = (Date.now() - t0) / 1000
+  const elapsed = (Date.now() - t0 - inShots) / 1000
 
   const end = await page.evaluate(() => {
     const m = (window as any).__studio.store.getState().model
@@ -136,7 +146,7 @@ test('the three kitchen changes by hand in the plan, in under five minutes', asy
   expect(Math.abs(end.range.x - fridge.x)).toBeLessThan(3)
   expect(Math.abs(end.range.y - fridge.y)).toBeLessThan(3)
   expect(end.range.rot).toBe(180) // faces up into the kitchen from the bottom wall
-  await page.screenshot({ path: `${SHOTS}/phase3-kitchen-3-swap.jpg`, quality: 80, type: 'jpeg' })
+  await shot(page, 'phase3-kitchen-3-swap.jpg')
   console.log(`[kitchen] three changes in ${elapsed.toFixed(1)} s, ${v} versions`)
   expect(elapsed).toBeLessThan(300)
   expect(errors).toEqual([])

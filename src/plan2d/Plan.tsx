@@ -1033,14 +1033,57 @@ function OpeningShapeView({ o, w, sel, ghost }: { o: Opening; w: Wall; sel: bool
   )
 }
 
+/** Words in a fixture's own name that say what it is, by kind ("Sink wall counter" is a counter). */
+const FAMILY: Record<string, string[]> = {
+  base_cabinet: ['counter', 'cabinets', 'cabinet', 'base'],
+  fridge: ['refrigerator', 'fridge', 'freezer'],
+  sink: ['sink'],
+  range: ['range', 'stove'],
+  stove: ['range', 'stove'],
+  oven_tower: ['oven', 'ovens'],
+  island: ['island'],
+  vanity: ['vanity'],
+  tub: ['tub', 'bath'],
+  toilet: ['toilet', 'wc'],
+}
+const VOCAB = new Set(['counter', 'cabinet', 'cabinets', 'pantry', 'island', 'vanity', 'sink', 'range', 'stove', 'cooktop', 'oven', 'ovens', 'dishwasher', 'refrigerator', 'fridge', 'freezer', 'tub', 'shower', 'toilet', 'washer', 'dryer', 'bed', 'table', 'sofa', 'desk', 'chair', 'bench'])
+
+/** One word for a fixture when its full name does not fit on the plan. */
+const KIND_WORD: Record<string, string> = {
+  base_cabinet: 'Counter',
+  island: 'Island',
+  vanity: 'Vanity',
+  sink: 'Sink',
+  range: 'Range',
+  cooktop: 'Cooktop',
+  dishwasher: 'DW',
+  fridge: 'Fridge',
+  oven_tower: 'Oven',
+  tall_cabinet: 'Tall',
+  wall_cabinet: 'Upper',
+  tub: 'Tub',
+  shower: 'Shower',
+  toilet: 'WC',
+  washer: 'W',
+  dryer: 'D',
+  water_heater: 'WH',
+  bed: 'Bed',
+  table: 'Table',
+  sofa: 'Sofa',
+  desk: 'Desk',
+}
+
 function ItemShape({ it, sel, k }: { it: Item; sel: boolean; k: number }) {
   const yaw = (it.rot * Math.PI) / 180
   const screenW = (Math.abs(Math.cos(yaw)) * it.w + Math.abs(Math.sin(yaw)) * it.d) / k
   const screenH = (Math.abs(Math.sin(yaw)) * it.w + Math.abs(Math.cos(yaw)) * it.d) / k
   const fitsIn = (text: string, room: number, across: number) => room >= text.length * 5.4 + 6 && across >= 13
-  const short = it.label.split(/[\s(]/)[0]
+  const words = it.label.toLowerCase().match(/[a-z]+/g) ?? []
+  const cap = (w: string | undefined) => (w ? w[0].toUpperCase() + w.slice(1) : undefined)
+  const family = words.find((w) => (FAMILY[it.kind] ?? []).includes(w))
+  const known = [...words].reverse().find((w) => VOCAB.has(w))
   const vertical = screenH > screenW * 1.4
-  const label = [it.label, short].find((t) => (vertical ? fitsIn(t, screenH, screenW) : fitsIn(t, screenW, screenH)))
+  const label = [it.label, cap(family), cap(known), KIND_WORD[it.kind], cap(words[0])].find((t) => t && (vertical ? fitsIn(t, screenH, screenW) : fitsIn(t, screenW, screenH)))
   return (
     <g data-k="item" data-id={it.id} className={`item${sel ? ' is-sel' : ''}${it.demolish ? ' is-demolish' : ''}`} transform={`translate(${it.x} ${it.y}) rotate(${-it.rot})`}>
       <rect x={-it.w / 2} y={-it.d / 2} width={it.w} height={it.d} />
