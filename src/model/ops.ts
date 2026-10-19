@@ -4,8 +4,10 @@
 import { type Role, ROLES, type Theme, slug } from '../lib/theme'
 import { deriveRooms, moveWall, placeAnchoredItems, updateDimensionStatus } from './derive'
 import { dot, polygonBounds, rv, wallDir, wallLeft, wallLength } from './geom'
+import { formatFeetInches } from './units'
 import {
   type Author,
+  type Dimension,
   ITEM_KINDS,
   type Item,
   type ItemKind,
@@ -88,7 +90,8 @@ export function settle(input: Model, notes: string[] = []): Model {
       return false
     }
     const at = Math.min(Math.max(o.at, o.w / 2), L - o.w / 2)
-    if (Math.abs(at - o.at) > 0.01) notes.push(`Kept ${o.kind} ${o.id} inside wall ${w.id} (moved ${Math.abs(at - o.at).toFixed(1)} in).`)
+    // Rounding nudges (under half an inch) are not worth a sentence.
+    if (Math.abs(at - o.at) >= 0.5) notes.push(`Kept ${o.kind} ${o.id} inside wall ${w.id} (moved ${Math.abs(at - o.at).toFixed(1)} in).`)
     o.at = Math.round(at * 100) / 100
     return true
   })
@@ -191,6 +194,10 @@ function applyOne(m: Model, op: Op, ctx: OpContext): Applied | string {
       if (m.openings.some((o) => o.id === op.id)) {
         m.openings = m.openings.filter((o) => o.id !== op.id)
         return { model: m, geometry: true }
+      }
+      if (m.dimensions.some((d) => d.id === op.id)) {
+        m.dimensions = m.dimensions.filter((d) => d.id !== op.id)
+        return { model: m, geometry: false }
       }
       const room = findRoom(m, op.id)
       if (room) return `rooms come from the walls around them; rename ${room.name} or remove a wall instead`
@@ -318,7 +325,7 @@ function applyOne(m: Model, op: Op, ctx: OpContext): Applied | string {
       m.openings = m.openings.filter((x) => x.wall !== w.id || x.at + x.w / 2 <= o.at - o.w / 2 || x.at - x.w / 2 >= o.at + o.w / 2)
       const replaced = before - openingsOn(m, w.id).length
       m.openings.push(o)
-      if (w.exterior || w.bearing === 'yes') addLockedNote(m, `Engineer to confirm: the new ${kind} in wall ${w.id} needs a header sized for the load.`, w, ctx)
+      if (mayCarryLoad(w)) addLockedNote(m, `Engineer to confirm: the new ${kind} in wall ${w.id} needs a header sized for the load.`, w, ctx)
       return { model: m, geometry: true, note: [head.note, replaced ? `Replaced ${replaced} opening${replaced > 1 ? 's' : ''} it overlapped.` : ''].filter(Boolean).join(' ') || undefined }
     }
     case 'update_opening': {
@@ -330,6 +337,9 @@ function applyOne(m: Model, op: Op, ctx: OpContext): Applied | string {
         o.prov.at = prov
       }
       if (num(op.w) !== undefined) {
+        const wall = m.walls.find((x) => x.id === o.wall)
+        if (wall && num(op.w)! - o.w > 6 && mayCarryLoad(wall))
+          addLockedNote(m, `Engineer to confirm: the ${o.kind} in wall ${wall.id} was widened to ${formatFeetInches(num(op.w)!)} and needs a header sized for the load.`, wall, ctx)
         o.w = num(op.w)!
         o.prov.w = prov
       }
@@ -395,6 +405,69 @@ function applyOne(m: Model, op: Op, ctx: OpContext): Applied | string {
       restack(m)
       return { model: m, geometry: false }
     }
+    case 'split_wall': {
+      // Two walls where there was one (the Wall tool clicking on a wall): the joint becomes a corner.
+      const w = m.walls.find((x) => x.id === op.id)
+      if (!w) return `no wall ${op.id}`
+      const L = wallLength(w)
+      const p = vec(op.at) ?? vec([op.x, op.y])
+      let s = num(op.s)
+      if (s === undefined && p) s = dot([p[0] - w.a[0], p[1] - w.a[1]], wallDir(w))
+      if (s === undefined || s < 1 || s > L - 1) return 'split point must be inside the wall'
+      const mine = openingsOn(m, w.id)
+      if (mine.some((o) => s! > o.at - o.w / 2 && s! < o.at + o.w / 2)) return 'cannot split a wall inside an opening'
+      const d = wallDir(w)
+      const x = rv([w.a[0] + d[0] * s, w.a[1] + d[1] * s])
+      const b: Wall = { ...structuredClone(w), id: op.newId && !m.walls.some((q) => q.id === op.newId) ? String(op.newId) : newId('w'), a: [...x] as Vec }
+      w.b = [...x] as Vec
+      m.walls.push(b)
+      for (const o of mine)
+        if (o.at > s) {
+          o.wall = b.id
+          o.at -= s
+        }
+      return { model: m, geometry: true }
+    }
+    case 'move_joint': {
+      // Drag a wall endpoint: every wall ending at that point moves with it.
+      const at = vec(op.at)
+      const to = vec(op.to)
+      if (!at || !to) return 'needs at and to'
+      const ends = m.walls.flatMap((w) => (['a', 'b'] as const).filter((e) => Math.hypot(w[e][0] - at[0], w[e][1] - at[1]) <= 0.5).map((e) => ({ w, e })))
+      if (!ends.length) return 'no wall ends there'
+      const moved = Math.hypot(to[0] - at[0], to[1] - at[1])
+      for (const { w, e } of ends) {
+        if (moved > 6 && mayCarryLoad(w)) addLockedNote(m, `Engineer to confirm: wall ${w.id} may carry load and its end was moved ${moved.toFixed(1)} in.`, w, ctx)
+        if (e === 'a') {
+          const shift = dot([to[0] - w.a[0], to[1] - w.a[1]], wallDir(w))
+          for (const o of openingsOn(m, w.id)) o.at -= shift
+        }
+        w[e] = rv(to)
+        w.prov[e] = prov
+        if (wallLength(w) < 1) return `wall ${w.id} would be shorter than 1 in`
+      }
+      return { model: m, geometry: true }
+    }
+    case 'dimension': {
+      // A measurement left on the plan (Measure tool); kept until cleared.
+      const a = vec(op.a)
+      const b = vec(op.b)
+      if (!a || !b) return 'needs a and b'
+      const value = num(op.value) ?? Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) * 8) / 8
+      const d: Dimension = {
+        id: op.id && !m.dimensions.some((x) => x.id === op.id) ? String(op.id) : newId('dim'),
+        level: levelOk(m, op.level, ctx),
+        a: rv(a),
+        b: rv(b),
+        value,
+        text: String(op.text ?? formatFeetInches(value)),
+        source: ctx.author === 'user' ? 'user' : 'auto',
+        status: 'unresolved',
+        binds: [],
+      }
+      m.dimensions.push(d)
+      return { model: m, geometry: false }
+    }
     case 'note': {
       if (!op.text) return 'needs text'
       const note: Note = { id: newId('note'), text: String(op.text), author: ctx.author === 'ai' ? 'ai' : 'user', createdAt: ctx.now ?? new Date().toISOString() }
@@ -434,6 +507,9 @@ export function restack(m: Model) {
 }
 
 /** Structural cautions are notes a person cannot remove (only acknowledge). */
+/** Exterior walls and any wall not marked as carrying no load (04, 10 structural cautions). */
+export const mayCarryLoad = (w: Wall) => w.exterior || w.bearing !== 'no'
+
 function addLockedNote(m: Model, text: string, w: Wall, ctx: OpContext) {
   if (m.notes.some((n) => n.text === text)) return
   const p: Vec = rv([(w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2])

@@ -164,3 +164,31 @@ describe('comparing versions', () => {
     expect(diffModels(after, after).empty).toBe(true)
   })
 })
+
+describe('plan editing ops', () => {
+  it('splits a wall at a point, giving the far piece its openings', () => {
+    const m = twoRooms()
+    const r = applyOps(m, [{ op: 'split_wall', id: 'top', at: [60, 0], newId: 'top2' }], { author: 'user' })
+    expect(r.skipped).toEqual([])
+    expect(r.model.walls.find((w) => w.id === 'top')!.b).toEqual([60, 0])
+    expect(r.model.walls.find((w) => w.id === 'top2')!.a).toEqual([60, 0])
+    expect(r.model.rooms.map((x) => x.name).sort()).toEqual(['Den', 'Office']) // rooms unchanged
+    expect(applyOps(m, [{ op: 'split_wall', id: 'mid', at: [120, 50] }]).skipped[0]).toMatch(/inside an opening/)
+  })
+
+  it('moves a joint: every wall ending there follows', () => {
+    const r = applyOps(twoRooms(), [{ op: 'move_joint', at: [240, 100], to: [252, 100] }], { author: 'user' })
+    expect(r.skipped).toEqual([])
+    expect(r.model.walls.find((w) => w.id === 'right')!.b).toEqual([252, 100])
+    expect(r.model.walls.find((w) => w.id === 'bottom')!.a ?? r.model.walls.find((w) => w.id === 'bottom')!.b).toBeTruthy()
+    const ends = r.model.walls.flatMap((w) => [w.a, w.b]).filter((p) => p[0] === 252 && p[1] === 100)
+    expect(ends).toHaveLength(2)
+  })
+
+  it("leaves a measurement on the plan as a person's dimension and clears it on delete", () => {
+    const r = applyOps(twoRooms(), [{ op: 'dimension', id: 'm1', a: [3, 50], b: [118, 50] }], { author: 'user' })
+    const d = r.model.dimensions.find((x) => x.id === 'm1')!
+    expect([d.value, d.text, d.source]).toEqual([115, `9'-7"`, 'user'])
+    expect(applyOps(r.model, [{ op: 'delete', id: 'm1' }]).model.dimensions).toEqual([])
+  })
+})
