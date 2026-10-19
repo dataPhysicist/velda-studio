@@ -2,7 +2,9 @@
 // so undo and redo are steps through versions, and the plan, 3D and Velda all see the same history.
 import { create } from 'zustand'
 import { type Op, applyOps, mayCarryLoad } from '../model/ops'
-import type { Model } from '../model/types'
+import { pointInPolygon, poleOfInaccessibility, wallLength } from '../model/geom'
+import type { Model, Room, Wall } from '../model/types'
+import { leftOf, pointOn, roomAt, thick } from '../plan2d/geometry'
 import { type SelKind, type Tool, commitVersion, isAsBuilt, newSchemeFromCurrent, nextVersionLabel, stepVersion, uniqueSchemeName, useStudio } from './store'
 
 export type Choice = { label: string; run: () => void; primary?: boolean }
@@ -203,6 +205,66 @@ export function structuralCaution(m: Model, ops: Op[]): string | null {
     }
   }
   return null
+}
+
+/** The rooms on the two sides of a wall at its middle (none, one or two). */
+export function roomsBeside(m: Model, w: Wall): Room[] {
+  const n = leftOf(w)
+  const mid = pointOn(w, wallLength(w) / 2)
+  const at = (k: number) => roomAt(m, w.level, [mid[0] + n[0] * (thick(w) / 2 + 6) * k, mid[1] + n[1] * (thick(w) / 2 + 6) * k])
+  return [at(1), at(-1)].filter((r): r is Room => !!r)
+}
+
+/**
+ * Remove what is selected. A wall between two named rooms joins them into one: the person picks the
+ * name that stays (06 section 2); an unnamed side just takes the other's name.
+ */
+export async function removeSelected(sel: { kind: SelKind; id: string }[], summary: string) {
+  const m = studio().model
+  if (!m) return
+  const ops: Op[] = sel.filter((s) => s.kind !== 'room' && s.kind !== 'stair' && s.kind !== 'comment').map((s) => ({ op: 'delete', id: s.id }))
+  if (!ops.length) {
+    if (sel[0]?.kind === 'room') notify('Rooms come from their walls: remove a wall to join two rooms, or rename this one.')
+    return
+  }
+  for (const s of sel) {
+    if (s.kind !== 'wall') continue
+    const w = m.walls.find((x) => x.id === s.id)
+    const [a, b] = w ? roomsBeside(m, w) : []
+    if (!a || !b || a.id === b.id || a.explicit || b.explicit) continue
+    // Does taking the wall out actually join them? Try it with b's name gone.
+    const trial = applyOps(m, [...ops, { op: 'merge_rooms', keep: a.id, drop: b.id }], { author: 'user' })
+    const joined = trial.model.rooms.find((r) => r.id === a.id)
+    if (!joined || !pointInPolygon(poleOfInaccessibility(b.polygon, 2), joined.polygon)) continue
+    const unnamed = (r: Room) => r.flags.includes('needs_name')
+    const run = (keep: Room, drop: Room) => handEdit([...ops, { op: 'merge_rooms', keep: keep.id, drop: drop.id }], `Removed the wall between ${a.name} and ${b.name}`)
+    if (unnamed(b) && !unnamed(a)) return run(a, b)
+    if (unnamed(a) && !unnamed(b)) return run(b, a)
+    return new Promise<void>((resolve) => {
+      const pick = (keep: Room, drop: Room) => () => {
+        useEditor.setState({ confirm: null })
+        void run(keep, drop).then(() => resolve())
+      }
+      useEditor.setState({
+        confirm: {
+          title: 'One room now',
+          body: `Without this wall, ${a.name} and ${b.name} become one room. Which name should it keep?`,
+          choices: [
+            { label: a.name, run: pick(a, b), primary: true },
+            { label: b.name, run: pick(b, a) },
+            {
+              label: 'Cancel',
+              run: () => {
+                useEditor.setState({ confirm: null })
+                resolve()
+              },
+            },
+          ],
+        },
+      })
+    })
+  }
+  await handEdit(ops, summary)
 }
 
 export const undo = () => stepVersion(-1)

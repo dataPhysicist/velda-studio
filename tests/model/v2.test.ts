@@ -88,6 +88,13 @@ describe('moving walls keeps the plan connected', () => {
     expect(size(r.model, 'Office').y).toBe(94)
   })
 
+  it('joins two rooms into one when the wall between them goes, keeping the name the person picked', () => {
+    const r = applyOps(deriveRooms(twoRooms()), [{ op: 'delete', id: 'mid' }, { op: 'merge_rooms', keep: 'r2', drop: 'r1' }], { author: 'user' })
+    expect(r.skipped).toEqual([])
+    expect(r.model.rooms.map((x) => [x.id, x.name])).toEqual([['r2', 'Office']])
+    expect(size(r.model, 'Office')).toEqual({ x: 234, y: 94 })
+  })
+
   it('stretches the walls at both corners when an outside wall moves', () => {
     const r = moveWall(twoRooms(), 'right', 24, { src: 'user' }) // left of 'right' (a->b points down the sheet) is +x, outward
     expect(r.ok).toBe(true)

@@ -7,8 +7,8 @@ import { dist, pointInPolygon, wallLength } from '../model/geom'
 import type { Comment, Item, Model, Opening, Vec, Wall } from '../model/types'
 import { formatFeetInches } from '../model/units'
 import { parseLength } from '../import/dims'
-import type { Op } from '../model/ops'
-import { clearSelection, handEdit, notify, select, setTool, useEditor } from '../app/editor'
+import { newId, type Op } from '../model/ops'
+import { clearSelection, handEdit, notify, removeSelected, select, setTool, useEditor } from '../app/editor'
 import { type Tool, useStudio } from '../app/store'
 import {
   across,
@@ -34,7 +34,7 @@ type Drag =
   | { kind: 'wall'; id: string; start: Vec; base: Model; delta: number; typed: string }
   | { kind: 'opening'; id: string; start: Vec; base: Model; at0: number; at: number }
   | { kind: 'edge'; id: string; which: 'a' | 'b'; base: Model; at: number; w: number }
-  | { kind: 'item'; id: string; start: Vec; base: Model; x: number; y: number; group: string[] }
+  | { kind: 'item'; id: string; start: Vec; base: Model; x: number; y: number; group: string[]; copy: boolean }
   | { kind: 'joint'; at: Vec; base: Model; to: Vec }
   | { kind: 'place'; wall: string; s0: number; s1: number }
 
@@ -237,7 +237,7 @@ function PlanView({ model }: { model: Model }) {
         const it = m.items.find((x) => x.id === t.id)!
         // Dragging one of several selected items moves them together.
         const group = already && !e.shiftKey ? selection.filter((s) => s.kind === 'item' && s.id !== t.id).map((s) => s.id) : []
-        setDrag({ kind: 'item', id: t.id, start: p, base: m, x: it.x, y: it.y, group })
+        setDrag({ kind: 'item', id: t.id, start: p, base: m, x: it.x, y: it.y, group, copy: e.altKey })
       } else if (t.kind === 'joint') {
         const [x, y] = t.id.split(',').map(Number)
         setDrag({ kind: 'joint', at: [x, y], base: m, to: [x, y] })
@@ -397,6 +397,12 @@ function PlanView({ model }: { model: Model }) {
       if (it.x === d.x && it.y === d.y) return done()
       const dx = d.x - it.x
       const dy = d.y - it.y
+      if (d.copy) {
+        // Alt-drag leaves the original and places a copy where the drag ends.
+        const its = [it, ...d.group.map((g) => d.base.items.find((q) => q.id === g)).filter(Boolean)] as Item[]
+        void duplicate(its, dx, dy).finally(done)
+        return
+      }
       const ops: Op[] = [{ op: 'move', id: d.id, x: d.x, y: d.y }, ...d.group.map((g) => ({ op: 'move', id: g, dx, dy }))]
       void handEdit(ops, d.group.length ? `Moved ${d.group.length + 1} things ${fmt(Math.hypot(dx, dy))}` : `Moved the ${it.label.toLowerCase()} ${fmt(Math.hypot(dx, dy))}`).finally(done)
     } else if (d.kind === 'joint') {
@@ -507,6 +513,20 @@ function PlanView({ model }: { model: Model }) {
         typedWallSize(drag)
         return
       }
+      if (mod && e.key.toLowerCase() === 'd') {
+        // Duplicate the selected fixtures, a foot over and down.
+        e.preventDefault()
+        const its = st.selection.filter((x) => x.kind === 'item').map((x) => cur.items.find((i) => i.id === x.id)).filter(Boolean) as Item[]
+        if (its.length) void duplicate(its, 12, 12)
+        return
+      }
+      if (mod && e.key.toLowerCase() === 'a') {
+        e.preventDefault()
+        useStudio.setState({
+          selection: [...cur.walls.filter((w) => w.level === level).map((w) => ({ kind: 'wall' as const, id: w.id })), ...cur.items.filter((i) => i.level === level).map((i) => ({ kind: 'item' as const, id: i.id }))],
+        })
+        return
+      }
       if (mod) return
       const keyTool: Record<string, Tool> = { v: 'select', w: 'wall', o: 'opening', m: 'measure', c: 'comment' }
       if (keyTool[e.key.toLowerCase()] && !e.altKey) {
@@ -540,9 +560,7 @@ function PlanView({ model }: { model: Model }) {
       if (!sel.length) return
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault()
-        const ops = sel.filter((s) => s.kind !== 'room' && s.kind !== 'stair' && s.kind !== 'comment').map((s) => ({ op: 'delete', id: s.id }))
-        if (ops.length) void handEdit(ops, `Removed ${describe(cur, sel[0].kind, sel[0].id)}`)
-        else if (sel[0].kind === 'room') notify('Rooms come from their walls: remove a wall to merge two rooms, or rename this one.')
+        void removeSelected(sel, sel.length > 1 ? `Removed ${sel.length} things` : `Removed ${describe(cur, sel[0].kind, sel[0].id)}`)
         return
       }
       const itemsSel = sel.filter((x) => x.kind === 'item').map((x) => cur.items.find((i) => i.id === x.id)).filter(Boolean) as Item[]
@@ -887,6 +905,18 @@ function ToolStrip({ tool, onPick }: { tool: Tool; onPick: (t: Tool) => void }) 
       {hint && <p className="tool-hint">{hint}</p>}
     </div>
   )
+}
+
+/** Copies of fixtures moved by dx, dy; the copies end up selected. */
+async function duplicate(its: Item[], dx: number, dy: number) {
+  const ids = its.map(() => newId('i'))
+  const ops: Op[] = its.map((it, i) => {
+    const { id: _id, prov: _p, anchor: _a, ...rest } = it
+    return { op: 'add_item', ...rest, id: ids[i], x: it.x + dx, y: it.y + dy }
+  })
+  await handEdit(ops, its.length === 1 ? `Copied the ${its[0].label.toLowerCase()}` : `Copied ${its.length} things`)
+  const have = new Set(useStudio.getState().model?.items.map((i) => i.id))
+  useStudio.setState({ selection: ids.filter((id) => have.has(id)).map((id) => ({ kind: 'item' as const, id })) })
 }
 
 const noun = (o: Opening) => (o.kind === 'window' ? 'the window' : o.kind === 'opening' ? 'the opening' : 'the door')

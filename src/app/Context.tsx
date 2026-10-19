@@ -8,7 +8,7 @@ import type { Op } from '../model/ops'
 import { type Badge, type Comment, type Item, type Model, type Opening, type OpeningKind, type Prov, type Room, type Wall, badgeOf, weakestBadge } from '../model/types'
 import { formatFeetInches as fmt } from '../model/units'
 import { roomAt, roomClearDims, leftOf, pointOn, thick } from '../plan2d/geometry'
-import { clearSelection, handEdit, select, setTool, useEditor } from './editor'
+import { clearSelection, handEdit, removeSelected, select, setTool, useEditor } from './editor'
 import { useStudio } from './store'
 
 const PROV_WORDS: Record<string, string> = {
@@ -238,7 +238,7 @@ function Many({ model }: { model: Model }) {
       <p className="muted small">Drag any of them to move them together. {items.length > 1 ? 'R turns the group a quarter turn.' : ''} Shift-click to add or drop one.</p>
       <div className="ctx-actions">
         {!!removable.length && (
-          <button type="button" className="btn" onClick={() => edit(removable.map((s) => ({ op: 'delete', id: s.id })), `Removed ${removable.length} things`)}>
+          <button type="button" className="btn" onClick={() => void removeSelected(removable, `Removed ${removable.length} things`)}>
             Remove {removable.length}
           </button>
         )}
@@ -380,7 +380,7 @@ function WallFields({ model, w }: { model: Model; w: Wall }) {
         </div>
       )}
       <div className="ctx-actions">
-        <button type="button" className="btn" onClick={() => edit([{ op: 'delete', id: w.id }], 'Removed a wall')}>
+        <button type="button" className="btn" onClick={() => void removeSelected([{ kind: 'wall', id: w.id }], 'Removed a wall')}>
           Remove wall
         </button>
       </div>

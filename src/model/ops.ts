@@ -468,6 +468,16 @@ function applyOne(m: Model, op: Op, ctx: OpContext): Applied | string {
       m.dimensions.push(d)
       return { model: m, geometry: false }
     }
+    case 'merge_rooms': {
+      // Two rooms become one (the wall between them was removed): the dropped room's name goes, so the
+      // next derivation gives the joined space the kept room's name and id.
+      const keep = findRoom(m, op.keep)
+      const drop = findRoom(m, op.drop)
+      if (!keep || !drop || keep.id === drop.id) return 'needs two different rooms'
+      m.rooms = m.rooms.filter((r) => r.id !== drop.id)
+      if (op.name) keep.name = String(op.name)
+      return { model: m, geometry: true }
+    }
     case 'note': {
       if (!op.text) return 'needs text'
       const note: Note = { id: newId('note'), text: String(op.text), author: ctx.author === 'ai' ? 'ai' : 'user', createdAt: ctx.now ?? new Date().toISOString() }

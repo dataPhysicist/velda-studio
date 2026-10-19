@@ -75,7 +75,7 @@ async function pickWall(page: Page): Promise<Pick | null> {
   }) as Promise<Pick | null>
 }
 
-test('the plan editor: drag a wall 12 in, add a door, flip it, delete it, undo twice', async ({ page }) => {
+test('the plan editor: drag a wall 12 in, add a door, flip it, delete it, undo twice, join two rooms', async ({ page }) => {
   test.setTimeout(240_000)
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(String(e)))
@@ -183,6 +183,29 @@ test('the plan editor: drag a wall 12 in, add a door, flip it, delete it, undo t
     return s.versions.find((v: any) => v.id === s.headId).summary
   })
   expect(head).toBe('Moved the door hinge to the other side')
+
+  // Remove the wall itself: the two rooms become one, and the person picks the name that stays.
+  const clear = await page.evaluate((id) => {
+    const m = (window as any).__studio.store.getState().model
+    const w = m.walls.find((x: any) => x.id === id)
+    const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1])
+    const ops = m.openings.filter((o: any) => o.wall === id)
+    for (let t = 8; t <= L - 8; t += 2) if (ops.every((o: any) => Math.abs(o.at - t) > o.w / 2 + 6)) return [w.a[0] + ((w.b[0] - w.a[0]) * t) / L, w.a[1] + ((w.b[1] - w.a[1]) * t) / L]
+    return null
+  }, p.wall)
+  expect(clear).not.toBeNull()
+  const onWall = await toScreen(page, clear as V)
+  await page.mouse.click(onWall[0], onWall[1])
+  await expect.poll(async () => (await state(page)).selection).toEqual([{ kind: 'wall', id: p.wall }])
+  await page.keyboard.press('Delete')
+  const ask = page.getByRole('alertdialog')
+  await expect(ask).toContainText('become one room')
+  await ask.getByRole('button', { name: p.b.name, exact: true }).click()
+  await expect(ask).toContainText('may carry load')
+  await ask.getByRole('button', { name: 'Remove it' }).click()
+  await expect
+    .poll(() => page.evaluate(({ a, b }) => (window as any).__studio.store.getState().model.rooms.filter((r: any) => r.id === a || r.id === b).map((r: any) => r.name), { a: p.a.id, b: p.b.id }))
+    .toEqual([p.b.name])
 
   await page.screenshot({ path: 'test-results/editor-smoke.png' })
   expect(errors).toEqual([])
