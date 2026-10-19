@@ -121,7 +121,7 @@ export async function handEdit(ops: Op[], summary: string, opts: { confirmed?: b
   try {
     const res = applyOps(model, ops, { author: 'user', versionLabel: nextVersionLabel(summary), focusLevel: studio().levelId })
     if (res.applied) await commitVersion(res.model, summary, 'hand', { author: 'user', ops })
-    if (res.skipped.length) notify(`Not changed: ${res.skipped.map((x) => plain(x.replace(/^[a-z_]+ [\w-]*: /, ''))).join('; ')}`)
+    if (res.skipped.length) notify(`${res.applied ? 'Done, except: ' : 'Not changed: '}${res.skipped.map((x) => plain(x.replace(/^[a-z_]+ [\w-]*: /, ''))).join('; ')}`)
     else {
       // The engineer notes are already said in the confirm; the rest, in plain words.
       const said = res.notes.filter((n) => !/^Engineer to confirm/.test(n)).map(plain)

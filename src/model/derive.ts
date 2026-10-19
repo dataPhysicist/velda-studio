@@ -78,6 +78,10 @@ const angleBetween = (u: Vec, v: Vec) => Math.abs(cross(u, v)) // sin of the ang
  * wall's centerline. Only gaps within about half a wall thickness plus 1.5 in are closed. Returns new
  * wall objects for the walls that changed; the rest are returned as they were.
  */
+const PLACED = new Set(['user', 'ai', 'field'])
+/** A wall whose ends were set by a person, Velda or a field measurement (not traced). */
+const placed = (w: Wall) => PLACED.has(w.prov.a.src) || PLACED.has(w.prov.b.src)
+
 export function healWalls(walls: Wall[]): { walls: Wall[]; moved: string[] } {
   const out = walls.map((w) => ({ ...w, a: [...w.a] as Vec, b: [...w.b] as Vec }))
   const moved = new Set<string>()
@@ -88,6 +92,7 @@ export function healWalls(walls: Wall[]): { walls: Wall[]; moved: string[] } {
   for (const long of byLength)
     for (const short of out) {
       if (short === long || short.level !== long.level || short.kind !== 'wall' || long.kind !== 'wall') continue
+      if (placed(short) || placed(long)) continue // a person or Velda put it there: a jog is meant
       if (wallLength(short) > wallLength(long) || angleBetween(wallDir(short), wallDir(long)) > 0.017) continue
       const endToEnd = (['a', 'b'] as const).some((e) => (['a', 'b'] as const).some((f) => dist(endPoint(short, e), endPoint(long, f)) <= 3.5))
       if (!endToEnd) continue

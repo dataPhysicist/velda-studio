@@ -31,6 +31,8 @@ export async function boot() {
     platform: () => import('../platform/check'),
     // The plan import, for the browser tests and the console.
     importFlow: () => import('./importFlow'),
+    // Hand edits (the plan editor), for test setup and the console.
+    editor: () => import('./editor'),
   }
   try {
     await repo.init()

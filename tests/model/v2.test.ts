@@ -74,6 +74,20 @@ describe('moving walls keeps the plan connected', () => {
     expect(badgeOf(mid.prov.a)).toBe('measured') // a person moved it
   })
 
+  it('keeps a small move a person made, even where the traced wall ran straight on', () => {
+    // The top wall traced as two pieces in line; a person moves the short one out 3/4 in. Room
+    // derivation heals traced jogs under 1 1/2 in, but not one a person made on purpose.
+    const m0 = twoRooms()
+    const T = { src: 'sheet_raster' as const }
+    m0.walls = m0.walls.filter((w) => w.id !== 'top')
+    m0.walls.push(wall('top1', [0, 0], [60, 0], 6, { exterior: true, bearing: 'yes', prov: { a: T, b: T, t: T } }))
+    m0.walls.push(wall('top2', [60, 0], [240, 0], 6, { exterior: true, bearing: 'yes', prov: { a: T, b: T, t: T } }))
+    const r = applyOps(deriveRooms(m0), [{ op: 'move', id: 'top1', dx: 0, dy: -0.75 }], { author: 'user' })
+    expect(r.skipped).toEqual([])
+    expect(size(r.model, 'Den').y).toBe(94.75)
+    expect(size(r.model, 'Office').y).toBe(94)
+  })
+
   it('stretches the walls at both corners when an outside wall moves', () => {
     const r = moveWall(twoRooms(), 'right', 24, { src: 'user' }) // left of 'right' (a->b points down the sheet) is +x, outward
     expect(r.ok).toBe(true)

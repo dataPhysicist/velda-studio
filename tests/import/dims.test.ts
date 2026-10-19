@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { formatFeetInches, orientationOf, parseDimension } from '../../src/import/dims'
+import { formatFeetInches, orientationOf, parseDimension, parseLength } from '../../src/import/dims'
 
 const truth = JSON.parse(readFileSync(new URL('../../scripts/fixtures/A2-asbuilt-level2.ground-truth.json', import.meta.url), 'utf8'))
 const items: { text: string; inches: number }[] = truth.dimension_strings.items
@@ -42,5 +42,22 @@ describe('dimension strings on the A2 sheet', () => {
     expect(formatFeetInches(96.25)).toBe(`8'-0 1/4"`)
     expect(formatFeetInches(45.75)).toBe(`3'-9 3/4"`)
     expect(formatFeetInches(11.99)).toBe(`1'-0"`)
+  })
+})
+
+describe('lengths a person types', () => {
+  it('reads feet and inches the ways people write them, and bare numbers as inches', () => {
+    const cases: [string, number | null][] = [
+      [`4'`, 48],
+      [`13'-2"`, 158],
+      [`13' 2"`, 158],
+      [`13' 2`, 158],
+      ['158', 158],
+      ['4 1/2', 4.5],
+      [`4'-6"`, 54],
+      ['36"', 36],
+      ['four feet', null],
+    ]
+    for (const [text, inches] of cases) expect(parseLength(text), text).toBe(inches)
   })
 })

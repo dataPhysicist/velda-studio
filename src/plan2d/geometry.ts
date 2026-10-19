@@ -62,7 +62,7 @@ export function openingShape(o: Opening, w: Wall): OpeningShape {
   }
   if (o.kind === 'opening' || o.style === 'cased') return { gap, lines: [], dashed: [[off(p0, t), off(p0, -t)], [off(p1, t), off(p1, -t)]] }
   if (o.style === 'sliding' || o.style === 'pocket' || o.style === 'barn') {
-    const k = thick(w) * 0.18
+    const k = Math.max(0.75, thick(w) * 0.22)
     const mid = pointOn(w, o.at)
     const lines: [Vec, Vec][] =
       o.style === 'pocket'

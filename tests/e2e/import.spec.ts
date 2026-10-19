@@ -45,5 +45,11 @@ test('a plan PDF comes in through the Confirm screen and A2 passes every hard ch
   expect(saved.model.levels[0].ceiling).toBe(108) // 9 ft, asked on the Confirm screen and approved
   expect(saved.model.levels[0].prov.ceiling.src).toBe('user')
   expect(saved.raster?.size).toBe(783147) // the plan picture is kept with the sheet for the underlay
+
+  // The studio opens on the new level's plan with that picture underneath.
+  await expect(page.getByTestId('plan')).toBeVisible()
+  await expect(page.locator('.plan image.underlay')).toHaveCount(1)
+  await expect(page.locator('.plan .room-name').filter({ hasText: 'Primary Bedroom' })).toHaveCount(1)
+  await page.screenshot({ path: 'test-results/import-plan.png' })
   expect(errors).toEqual([])
 })

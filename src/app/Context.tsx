@@ -2,7 +2,7 @@
 // with its provenance in words. Editing a field is a hand edit (a version by the person, provenance
 // "you set this"). With nothing selected it says what to do next, never an empty panel.
 import { useEffect, useState } from 'react'
-import { parseDimension } from '../import/dims'
+import { parseLength } from '../import/dims'
 import { polygonArea, wallLength } from '../model/geom'
 import type { Op } from '../model/ops'
 import { type Badge, type Comment, type Item, type Model, type Opening, type OpeningKind, type Prov, type Room, type Wall, badgeOf, weakestBadge } from '../model/types'
@@ -10,18 +10,6 @@ import { formatFeetInches as fmt } from '../model/units'
 import { roomAt, roomClearDims, leftOf, pointOn, thick } from '../plan2d/geometry'
 import { clearSelection, handEdit, select, setTool, useEditor } from './editor'
 import { useStudio } from './store'
-
-/** A length typed by a person: 13'-2", 13' 2", 158, 158", 4 1/2. */
-export function parseLength(text: string): number | null {
-  const t = text.trim()
-  if (/^\d+(\.\d+)?$/.test(t)) return Number(t)
-  if (/^\d+ \d+\/\d+$/.test(t)) {
-    const [w, f] = t.split(' ')
-    const [n, d] = f.split('/').map(Number)
-    return d ? Number(w) + n / d : null
-  }
-  return parseDimension(t) ?? parseDimension(`${t}"`)
-}
 
 const PROV_WORDS: Record<string, string> = {
   sheet_dim: 'measured from drawing',

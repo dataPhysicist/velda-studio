@@ -45,6 +45,19 @@ export function parseDimension(text: string): number | null {
   return null
 }
 
+/** A length a person typed: 13'-2", 13' 2", 4', 158, 158", 4 1/2. Bare numbers are inches. */
+export function parseLength(text: string): number | null {
+  const t = normalizeDimText(text)
+  if (/^\d+(\.\d+)?$/.test(t)) return Number(t)
+  if (/^\d+ \d+\/\d+$/.test(t)) {
+    const [w, f] = t.split(' ')
+    const [n, d] = f.split('/').map(Number)
+    return d ? Number(w) + n / d : null
+  }
+  const spaced = t.replace(/^(\d+)'\s+(\d)/, "$1'-$2") // 13' 2" reads like 13'-2"
+  return parseDimension(spaced) ?? parseDimension(`${spaced}"`)
+}
+
 function frac(n: string, d: string) {
   const den = Number(d)
   return den > 0 ? Number(n) / den : NaN

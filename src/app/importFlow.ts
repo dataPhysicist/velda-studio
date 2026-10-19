@@ -8,7 +8,7 @@ import { type PdfRead, planJpeg, readPdf, renderPlanRect, traceInWorker } from '
 import type { TraceResult } from '../import/raster/trace'
 import { deriveRooms, updateDimensionStatus } from '../model/derive'
 import type { Model, OpeningKind } from '../model/types'
-import { createScheme, useStudio } from './store'
+import { createScheme, focusOn, useStudio } from './store'
 
 export type PageChoice = { role: 'asbuilt' | 'proposed' | 'reference' | 'skip'; level: string | null }
 type Fix = { kind: 'remove_wall'; id: string } | { kind: 'remove_opening'; id: string } | { kind: 'opening_kind'; id: string; to: OpeningKind }
@@ -217,6 +217,8 @@ export async function approve() {
     const summary = `Imported from ${sheet.id}${g.issue ? ` (${g.issue})` : ''}`
     const name = sheet.role === 'proposed' ? `Proposed ${model.levels[0].name}` : 'As-built'
     const { scheme } = await createScheme({ name, role: sheet.role === 'proposed' ? 'proposed' : 'asbuilt', model, summary, author: 'import', source: 'import' })
+    // The studio opens on the plan of the new level, with the drawing underneath (06 section 8).
+    focusOn({ view: 'plan', levelId: model.levels[0]?.id ?? null, roomId: null })
     set({ made: [...made, { scheme: scheme.name, sheet: sheet.id }] })
     if (get().queue.length) await nextSheet()
     else {

@@ -392,9 +392,10 @@ input.fld-num.is-bad { border-color: var(--warn); }
 .ctx-tab { writing-mode: vertical-rl; border: 0; border-left: 1px solid var(--line); background: var(--vellum); color: var(--slate); font-size: 13px; padding: 16px 0; }
 .ctx-tab:hover { color: var(--graphite); }
 
-.notice { position: absolute; left: 50%; bottom: 112px; transform: translateX(-50%); z-index: 5; max-width: 70%; background: var(--graphite); color: var(--paper); padding: 8px 14px; border-radius: 8px; font-size: 14px; }
+.notice { pointer-events: none; position: absolute; left: 50%; bottom: 112px; transform: translateX(-50%); z-index: 5; max-width: 70%; background: var(--graphite); color: var(--paper); padding: 8px 14px; border-radius: 8px; font-size: 14px; }
 .confirm-veil { position: fixed; inset: 0; z-index: 60; background: rgba(35, 40, 44, 0.28); display: grid; place-items: center; }
 .confirm { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px 18px; width: min(460px, 90vw); }
 .confirm h2 { font: 400 26px/1.15 var(--serif); margin: 0 0 8px; }
 .confirm p { margin: 0; }
 .confirm-row { display: flex; gap: 12px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+.plan .op.st-sliding line, .plan .op.st-pocket line, .plan .op.st-barn line { stroke-width: 1.8px; }

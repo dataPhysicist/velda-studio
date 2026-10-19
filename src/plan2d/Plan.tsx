@@ -6,7 +6,7 @@ import { deriveRooms, moveWall } from '../model/derive'
 import { dist, pointInPolygon, wallLength } from '../model/geom'
 import type { Comment, Item, Model, Opening, Vec, Wall } from '../model/types'
 import { formatFeetInches } from '../model/units'
-import { parseDimension } from '../import/dims'
+import { parseLength } from '../import/dims'
 import type { Op } from '../model/ops'
 import { clearSelection, handEdit, notify, select, setTool, useEditor } from '../app/editor'
 import { type Tool, useStudio } from '../app/store'
@@ -75,7 +75,7 @@ function PlanView({ model }: { model: Model }) {
     const r = svg.current?.getBoundingClientRect()
     const W = r?.width || 900
     const H = r?.height || 600
-    const pad = { t: 70, r: 28, b: 76, l: 46 }
+    const pad = { t: 86, r: 28, b: 76, l: 50 }
     const s = Math.max((b.x1 - b.x0) / Math.max(100, W - pad.l - pad.r), (b.y1 - b.y0) / Math.max(100, H - pad.t - pad.b), 0.05)
     const cx = (b.x0 + b.x1) / 2
     const cy = (b.y0 + b.y1) / 2
@@ -113,7 +113,7 @@ function PlanView({ model }: { model: Model }) {
   const wallById = new Map(m.walls.map((w) => [w.id, w]))
   const openings = m.openings.filter((o) => wallById.get(o.wall)?.level === level)
   const rooms = m.rooms.filter((r) => r.level === level)
-  const items = m.items.filter((i) => i.level === level)
+  const items = m.items.filter((i) => i.level === level).sort((a, b) => b.w * b.d - a.w * a.d) // small fixtures draw on top of counters
   const isSel = (kind: string, id: string) => selection.some((s) => s.kind === kind && s.id === id)
   const selRoomId = selection.find((s) => s.kind === 'room')?.id ?? roomId
   const selRoom = rooms.find((r) => r.id === selRoomId)
@@ -123,10 +123,28 @@ function PlanView({ model }: { model: Model }) {
   const shownOpacity = opacity ?? (edited ? 0 : 0.35)
 
   // ---------------------------------------------------------------- snapping
-  const snapPoint = (p: Vec, from?: Vec, orth = true): Vec => {
+  const snapPoint = (p: Vec, from?: Vec, orth = true, onWalls = false): Vec => {
     const tol = 8 * perPx()
     // wall ends and joints first
     for (const w of walls) for (const e of [w.a, w.b]) if (near(p, e, tol)) return [e[0], e[1]]
+    const q = snapGrid(p, from, orth)
+    if (!onWalls) return q
+    // Inside a wall's body: land on its centerline (so a new wall tees in), along the line being drawn.
+    const host = walls.find((w) => Math.abs(across(w, q)) <= thick(w) / 2 + 2 * perPx() && along(w, q) > 1 && along(w, q) < wallLength(w) - 1)
+    if (!host) return q
+    const n = leftOf(host)
+    const off = across(host, q)
+    if (from) {
+      const d: Vec = [q[0] - from[0], q[1] - from[1]]
+      const dn = d[0] * n[0] + d[1] * n[1]
+      if (Math.abs(dn) > 1e-6) {
+        const k = off / dn
+        return [r8(q[0] - d[0] * k), r8(q[1] - d[1] * k)]
+      }
+    }
+    return [r8(q[0] - n[0] * off), r8(q[1] - n[1] * off)]
+  }
+  const snapGrid = (p: Vec, from?: Vec, orth = true): Vec => {
     let q: Vec = [Math.round(p[0]), Math.round(p[1])]
     if (from && orth) {
       const dx = q[0] - from[0]
@@ -230,7 +248,7 @@ function PlanView({ model }: { model: Model }) {
       return
     }
     if (tool === 'wall') {
-      const q = snapPoint(p, drawing[drawing.length - 1])
+      const q = snapPoint(p, drawing[drawing.length - 1], true, true)
       if (drawing.length && near(q, drawing[drawing.length - 1], 0.5)) return
       setDrawing([...drawing, q])
       return
@@ -294,9 +312,9 @@ function PlanView({ model }: { model: Model }) {
       const next = deriveRooms(res.model)
       setPreview(next)
       setDrag({ ...drag, delta: d })
-      const before = sideRooms(drag.base, w)
+      const before = sideRooms(drag.base, w).sort((a, b) => (a.id === roomId ? -1 : b.id === roomId ? 1 : 0))
       setReadout(
-        [`${d >= 0 ? '' : '−'}${fmt(Math.abs(d))}`, ...before.map((r) => {
+        [`Moved ${fmt(Math.abs(d))}`, ...before.map((r) => {
           const after = next.rooms.find((x) => x.id === r.id)
           return `${r.name} ${fmt(extentAcross(r.polygon, n))} → ${after ? fmt(extentAcross(after.polygon, n)) : '?'}`
         })].join('   '),
@@ -415,8 +433,8 @@ function PlanView({ model }: { model: Model }) {
     const t = useEditor.getState().wallT
     // Ends that land on the body of a wall split it there, so the new wall tees in.
     for (const p of [pts[0], pts[pts.length - 1]]) {
-      const host = model.walls.find((w) => w.level === level && Math.abs(across(w, p)) <= thick(w) / 2 + 0.5 && along(w, p) > 1 && along(w, p) < wallLength(w) - 1)
-      if (host) ops.push({ op: 'split_wall', id: host.id, at: pointOn(host, along(host, p)) })
+      const host = model.walls.find((w) => w.level === level && Math.abs(across(w, p)) <= 0.25 && along(w, p) > 1 && along(w, p) < wallLength(w) - 1)
+      if (host) ops.push({ op: 'split_wall', id: host.id, at: p })
     }
     for (let i = 1; i < pts.length; i++) ops.push({ op: 'add_wall', a: pts[i - 1], b: pts[i], t, level })
     void handEdit(ops, `Added ${pts.length - 1 === 1 ? 'a wall' : `${pts.length - 1} walls`}`)
@@ -478,6 +496,7 @@ function PlanView({ model }: { model: Model }) {
       if (!cur) return
       // typing a size while dragging a wall sets that room's size exactly
       if (drag?.kind === 'wall' && /^[\d'" -/]$/.test(e.key)) {
+        e.stopImmediatePropagation() // "1" and "3" here are a size, not the view keys
         setDrag({ ...drag, typed: drag.typed + e.key })
         setReadout(`Type the size, then Enter: ${drag.typed + e.key}`)
         e.preventDefault()
@@ -577,8 +596,9 @@ function PlanView({ model }: { model: Model }) {
 
   const typedWallSize = (d: Extract<Drag, { kind: 'wall' }>) => {
     const w = d.base.walls.find((x) => x.id === d.id)!
-    const want = parseDimension(/["']/.test(d.typed) ? d.typed : `${d.typed}"`)
-    const room = sideRooms(d.base, w)[0]
+    const want = parseLength(d.typed)
+    const sides = sideRooms(d.base, w)
+    const room = sides.find((r) => r.id === roomId) ?? sides[0]
     if (want === null || !room) {
       notify(`Could not read “${d.typed}” as a size. Try 13'-2" or 158.`)
       setDrag(null)
@@ -728,6 +748,7 @@ function PlanView({ model }: { model: Model }) {
           {rooms.map((r) => {
             if (r.polygon.length < 3) return null
             const l = roomLabel(r)
+            l.at = clearOfItems(l.at, r.polygon, items, l.name.length * 7.5 * k, 30 * k)
             return (
               <text key={r.id} x={l.at[0]} y={l.at[1]} data-k="roomname" data-id={r.id} className={`room-name${r.id === selRoomId ? ' is-sel' : ''}`} style={{ fontSize: 13 * k }}>
                 <tspan x={l.at[0]}>{l.name}</tspan>
@@ -761,7 +782,7 @@ function PlanView({ model }: { model: Model }) {
           return <line x1={pointOn(w, drag.s0)[0]} y1={pointOn(w, drag.s0)[1]} x2={pointOn(w, drag.s1)[0]} y2={pointOn(w, drag.s1)[1]} className="placing" />
         })()}
         {tool === 'wall' && drawing.length > 0 && (
-          <polyline points={pts([...drawing, ...(cursor ? [snapPoint(cursor.p, drawing[drawing.length - 1])] : [])])} className="drawing" style={{ strokeWidth: 4.5 }} />
+          <polyline points={pts([...drawing, ...(cursor ? [snapPoint(cursor.p, drawing[drawing.length - 1], true, true)] : [])])} className="drawing" style={{ strokeWidth: useEditor.getState().wallT }} />
         )}
         {tool === 'measure' && measure && cursor && <line x1={measure[0]} y1={measure[1]} x2={snapPoint(cursor.p, undefined, false)[0]} y2={snapPoint(cursor.p, undefined, false)[1]} className="measuring" />}
         <CommentPins level={level} k={k} />
@@ -773,7 +794,7 @@ function PlanView({ model }: { model: Model }) {
       )}
       {tool === 'wall' && drawing.length > 0 && cursor && (
         <div className="readout" style={{ left: cursor.client[0] - (svg.current?.getBoundingClientRect().left ?? 0) + 16, top: cursor.client[1] - (svg.current?.getBoundingClientRect().top ?? 0) + 16 }}>
-          {fmt(dist(drawing[drawing.length - 1], snapPoint(cursor.p, drawing[drawing.length - 1])))} · Enter or double-click to finish
+          {fmt(dist(drawing[drawing.length - 1], snapPoint(cursor.p, drawing[drawing.length - 1], true, true)))} · Enter or double-click to finish
         </div>
       )}
       {commentAt && <CommentBox at={commentAt.p} left={commentAt.left} top={commentAt.top} level={level} onDone={() => setCommentAt(null)} />}
@@ -888,6 +909,29 @@ function withItem(m: Model, id: string, patch: Partial<Item>): Model {
   return { ...m, items: m.items.map((o) => (o.id === id ? { ...o, ...patch } : o)) }
 }
 
+/** Footprint box of an item on the plan (rotated to the nearest axis). */
+function itemBox(it: Item) {
+  const yaw = (it.rot * Math.PI) / 180
+  const hx = Math.abs(Math.cos(yaw)) * (it.w / 2) + Math.abs(Math.sin(yaw)) * (it.d / 2)
+  const hy = Math.abs(Math.sin(yaw)) * (it.w / 2) + Math.abs(Math.cos(yaw)) * (it.d / 2)
+  return { x0: it.x - hx, y0: it.y - hy, x1: it.x + hx, y1: it.y + hy }
+}
+
+/** Move a room's name off a fixture it would sit on (an island in the middle of a kitchen). */
+function clearOfItems(at: Vec, poly: Vec[], items: Item[], w: number, h: number): Vec {
+  const boxes = items.map(itemBox)
+  const hits = (p: Vec) => boxes.some((b) => p[0] + w / 2 > b.x0 && p[0] - w / 2 < b.x1 && p[1] + h * 0.6 > b.y0 && p[1] - h * 0.4 < b.y1)
+  if (!hits(at)) return at
+  const b = boxes.find((x) => at[0] + w / 2 > x.x0 && at[0] - w / 2 < x.x1 && at[1] + h * 0.6 > x.y0 && at[1] - h * 0.4 < x.y1)!
+  const tries: Vec[] = [
+    [at[0], b.y0 - h * 0.7],
+    [at[0], b.y1 + h * 0.5],
+    [b.x0 - w / 2 - 4, at[1]],
+    [b.x1 + w / 2 + 4, at[1]],
+  ]
+  return tries.find((p) => pointInPolygon(p, poly) && !hits(p)) ?? at
+}
+
 /** Snap an item so its back (or a side) sits flush on a nearby wall face. */
 function snapItemToWalls(m: Model, it: Item, x: number, y: number, tol: number): [number, number] {
   const yaw = (it.rot * Math.PI) / 180
@@ -963,16 +1007,19 @@ function ItemShape({ it, sel, k }: { it: Item; sel: boolean; k: number }) {
   const yaw = (it.rot * Math.PI) / 180
   const screenW = (Math.abs(Math.cos(yaw)) * it.w + Math.abs(Math.sin(yaw)) * it.d) / k
   const screenH = (Math.abs(Math.sin(yaw)) * it.w + Math.abs(Math.cos(yaw)) * it.d) / k
-  const fits = screenW >= it.label.length * 5.6 + 8 && screenH >= 14
+  const fitsIn = (text: string, room: number, across: number) => room >= text.length * 5.4 + 6 && across >= 13
+  const short = it.label.split(/[\s(]/)[0]
+  const vertical = screenH > screenW * 1.4
+  const label = [it.label, short].find((t) => (vertical ? fitsIn(t, screenH, screenW) : fitsIn(t, screenW, screenH)))
   return (
     <g data-k="item" data-id={it.id} className={`item${sel ? ' is-sel' : ''}${it.demolish ? ' is-demolish' : ''}`} transform={`translate(${it.x} ${it.y}) rotate(${-it.rot})`}>
       <rect x={-it.w / 2} y={-it.d / 2} width={it.w} height={it.d} />
       {/* front edge marker: rot 0 faces +y */}
       <line x1={-it.w / 2 + 2} y1={it.d / 2 - 2} x2={it.w / 2 - 2} y2={it.d / 2 - 2} className="item-front" />
       <title>{it.label}</title>
-      {fits && (
-        <text x={0} y={0} className="item-label" style={{ fontSize: 10 * k }} transform={`rotate(${it.rot})`}>
-          {it.label}
+      {label && (
+        <text x={0} y={0} className="item-label" style={{ fontSize: 9.5 * k }} transform={`rotate(${it.rot + (vertical ? -90 : 0)})`}>
+          {label}
         </text>
       )}
     </g>
