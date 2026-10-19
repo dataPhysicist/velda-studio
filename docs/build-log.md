@@ -165,7 +165,7 @@ Decisions N8 needs: none for Phase 3.
 
 Next: Phase 4, 3D parity: compile v2 with openings, swings, stairs, wall kinds and per-room themes; cut-away modes; stacked and solo levels; selection shared between 3D and the plan; framing; lighting presets; Walk regression check. Then the gate review with N8.
 
-## 2026-10-19  Phase 4  commits 150ecf5 to PENDING (dev release, build PENDING)
+## 2026-10-19  Phase 4  commits 150ecf5, b62b3f9 (dev release, build 4ff9f71)
 
 Done:
 - 3D from model v2 (`src/view3d/compile.ts`): doors stand open the way the plan swings them (hinge end and side), with sliding, pocket, barn, folding, pair and garage doors drawn as what they are; windows take their type; stairs become a straight flight; half walls (3'-6") and rails (3'-0") stop short of the ceiling; a room's own color scheme reaches its walls where every room the wall faces shares it.
@@ -177,7 +177,8 @@ Evidence:
 - `tests/e2e/editor.spec.ts` now checks the 3D scene after every edit in the Phase 3 test (the moved wall and its stretched neighbors, the new door, both flips, the delete, both undos, the joined room): each one is in the 3D scene graph by the time the version is saved, the same frame the plan shows it.
 - `tests/e2e/view3d.spec.ts`: with walls full in 3D it stands in the Primary Bedroom, looks at a wall and clicks it; the plan's selection is that wall, the Selection panel shows it, 3D highlights it, and the plan has it selected after pressing 1. Then Walk through in the Primary Bathroom starts inside the room and W moves you at eye height; Esc leaves.
 - Screenshots (local preview, level 2, software rendering): `docs/buildlog/phase4-walls-cutaway.jpg`, `-up.jpg`, `-translucent.jpg`, `-down.jpg`, and `phase4-floors-apart-morning-sun.jpg` (whole house, floors spread apart, morning sun, with the options open).
-- Dev release: PENDING. CI: PENDING.
+- Dev release with `scripts/release.sh`: check passed inside the script (60 unit, 7 browser tests), build 4ff9f71 for `velda_studio_dev.duckdb`, `release.json` on main points at it. CI run 39277955902 on 1514671: success (27 minutes including the wait for a runner).
+- Screenshots queued for `velda-studio/buildlog/` on the next signed-in open.
 
 Open:
 - The signed-in Toolbelt page: unverified in Toolbelt. Everything from Phase 1 on waits for one signed-in open: the migration of N8's real schemes on the test copy, the armed platform checks, the A2 import in the page, the build log screenshots copied to `velda-studio/buildlog/`, and seeing 3D on a real GPU. The 09 gate's "verify by eye in the signed-in page" is N8's to do at the gate review.
