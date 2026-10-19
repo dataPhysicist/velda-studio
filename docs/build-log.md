@@ -134,7 +134,7 @@ Open:
 
 Decisions N8 needs: none for Phase 2. Phase 3 starts by confirming the five-tool strip (09).
 
-## 2026-10-19  Phase 3  commits dae9651 to ea9aa86 (dev release, build PENDING)
+## 2026-10-19  Phase 3  commits dae9651 to ea9aa86 (dev release, build 431ecb8)
 
 Done:
 - Plan view (`src/plan2d/Plan.tsx`, `geometry.ts`, `underlay.ts`; key 1 or Plan): walls at their true thickness (outside walls darker, demolish walls hatched red), doors with leaf and swing, pairs, sliding and pocket doors, windows as three lines, open passages with dashed jambs, rooms with name and area at the pole of the outline, stairs, fixtures with their footprint and a label that fits, the selected room's clear dimensions colored by provenance (ink measured, amber traced, grey assumed, blue Velda, red conflict), the level's overall size along the top and left, the person's measurements, comment pins. The plan picture from an import sits underneath (35 percent until a wall is edited, slider in the corner). Wheel zoom, drag or Space-drag to pan, F to fit, double-click a room to frame it.
@@ -149,7 +149,8 @@ Evidence:
 - `tests/e2e/kitchen.spec.ts` (the Phase 3 gate): the three kitchen changes from the design review on the level 1 kitchen of the migrated v0.3 "N8 kitchen" scheme (the local preview), every step a mouse or keyboard gesture in the plan or the Selection panel: the sink dragged onto the island and turned; a 6 ft opening dragged along the sink wall with the Opening tool (it takes the window's place), made a sliding door in the panel, the sink wall counter cut to 4'-6" in the panel and slid clear of the doors; the refrigerator and freezer columns selected together, turned three quarter turns as a group and slid onto the range wall, the range slid to where the tower was and turned. 13 hand edits, 8.7 s of machine time in this sandbox; a person needs the same gestures (about 20 clicks, drags and keys), well inside five minutes. That scheme already had the sink on the island (v0.3 made that change by chat), so one setup edit first puts it back on the sink wall counter; it is labeled "(test setup)" in the history. Screenshots: `docs/buildlog/phase3-kitchen-0-before.jpg`, `-1-sink.jpg`, `-2-patio-doors.jpg`, `-3-swap.jpg`.
 - `tests/e2e/import.spec.ts` now also checks that the studio opens on the imported level's plan with the plan picture underneath (`docs/buildlog/phase3-plan-after-import.jpg`).
 - Typed sizes, the Measure and Comment tools, the Wall tool, the as-built confirm with "Make a new scheme", copying and select-all were run in the local preview with a script (not kept as tests): IT Closet set to exactly 4'-0" by typing during a drag; "Measured 7'-5""; a pinned note; a drawn wall; the as-built confirm branching to "Option 1" with the edit there.
-- CI: PENDING. Dev release: PENDING.
+- Dev release with `scripts/release.sh`: check passed inside the script (53 unit, 6 browser tests), build 431ecb8 for `velda_studio_dev.duckdb`, `release.json` on main points at it. CI run 39261032914 on f37c298: success in 4m24s.
+- Screenshots queued for `velda-studio/buildlog/` on the next signed-in open (with the earlier three).
 
 Open:
 - The signed-in Toolbelt page: unverified in Toolbelt (still not signed in in the built-in browser, and the link to N8's computer dropped during this phase). The kitchen changes on his real "N8 kitchen" scheme in the page wait for that.
