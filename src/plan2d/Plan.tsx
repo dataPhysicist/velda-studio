@@ -23,6 +23,7 @@ import {
   roomAt,
   roomClearDims,
   roomLabel,
+  dimText,
   thick,
   unit,
   wallPoly,
@@ -772,11 +773,13 @@ function PlanView({ model }: { model: Model }) {
               const mid: Vec = [(d.a[0] + d.b[0]) / 2, (d.a[1] + d.b[1]) / 2]
               const vertical = Math.abs(d.b[1] - d.a[1]) > Math.abs(d.b[0] - d.a[0])
               const badge = dimBadge(m, d)
+              const said = dimText(m, d)
               return (
                 <g key={d.id} data-k="dimension" data-id={d.id} className={`dim b-${badge}${isSel('dimension', d.id) ? ' is-sel' : ''}`}>
+                  <title>{said.title}</title>
                   <line x1={d.a[0]} y1={d.a[1]} x2={d.b[0]} y2={d.b[1]} />
                   <text x={mid[0]} y={mid[1] - 2.5 * k} transform={vertical ? `rotate(-90 ${mid[0]} ${mid[1]})` : undefined} style={{ fontSize: 11 * k }}>
-                    {d.text}
+                    {said.text}
                   </text>
                 </g>
               )

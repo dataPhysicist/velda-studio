@@ -4,6 +4,7 @@
 import { pointInPolygon, poleOfInaccessibility, polygonArea, polygonBounds, wallLength } from '../model/geom'
 import { type Badge, type Dimension, type Model, type Opening, type Room, type Vec, type Wall, badgeOf, weakestBadge } from '../model/types'
 import { formatFeetInches } from '../model/units'
+import { bindCoordinate } from '../model/derive'
 
 export const unit = (w: { a: Vec; b: Vec }): Vec => {
   const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) || 1
@@ -176,6 +177,22 @@ export function dimBadge(m: Model, d: Dimension): Badge | 'conflict' {
   if (d.source === 'user' || d.source === 'field') return 'measured'
   if (d.source === 'sheet') return d.status === 'ok' ? 'measured' : 'assumed'
   return 'assumed'
+}
+
+/**
+ * What a dimension says on the plan. One in conflict shows both numbers (06 section 3): what the drawing
+ * (or the tape) said and what the walls measure now, so a wall moved on purpose explains itself.
+ */
+export function dimText(m: Model, d: Dimension): { text: string; title: string } {
+  if (d.status !== 'conflict') return { text: d.text, title: d.text }
+  const c0 = bindCoordinate(m, d, 0)
+  const c1 = bindCoordinate(m, d, 1)
+  const now = c0 !== null && c1 !== null ? formatFeetInches(Math.abs(c1 - c0)) : null
+  const said = d.source === 'sheet' ? 'drawn' : 'measured'
+  return {
+    text: now ? `${d.text} ${said}, ${now} now` : d.text,
+    title: now ? `The ${d.source === 'sheet' ? 'drawing says' : 'tape measured'} ${d.text}; the walls measure ${now} now.` : d.text,
+  }
 }
 
 export function roomAt(m: Model, level: string, p: Vec): Room | undefined {

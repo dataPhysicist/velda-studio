@@ -21,6 +21,7 @@ const WORDS: [RegExp, string][] = [
   [/\b\d+(\.\d+)?\s?(mm|cm)\b/, 'metric units'],
   [/—/, 'an em dash'],
   [/\d{4}-\d\d-\d\dT\d\d:/, 'a raw timestamp'],
+  [/\b\w*\d[a-z]+\d+[a-z]\w*\b/, 'an id'],
 ]
 
 /** Everything visible or spoken on the page right now, one entry per source. */

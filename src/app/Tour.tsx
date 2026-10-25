@@ -2,9 +2,11 @@
 // that points at the real thing: click a room, say something to Velda, drag a wall, add a Pinterest
 // link, share. Each step finishes when the person does it; every step can be skipped and the tour ended.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEditor } from './editor'
 import { startImport, useImport } from './importFlow'
 import { openDialog, useDialogs } from './Palette'
 import { setPrefs, useStudio } from './store'
+import { firstChange } from './suggest'
 
 /** The sample plan (the A2 sheet) next to the build: jsDelivr at the release commit, or the dev server. */
 export function sampleUrl() {
@@ -93,10 +95,10 @@ const STEPS: Step[] = [
   },
   {
     title: 'Drag a wall',
-    body: 'Drag a wall in the plan. Both rooms change size as you go, and you can type a size to set it exactly. Cmd-Z undoes it.',
+    body: 'Drag a wall in the plan. Both rooms change size as you go, and you can type a size to set it exactly. On the as-built you are asked first, so the record stays as it is. Cmd-Z undoes it.',
     anchor: '.plan-svg',
     enter: () => useStudio.setState({ view: 'plan', tool: 'select' as any }),
-    done: (s, a) => s.versions.length > a.versions && /wall/i.test(s.versions[s.versions.length - 1]?.summary ?? ''),
+    done: (s, a) => s.versions.length > a.versions && /wall|^made /i.test(s.versions[s.versions.length - 1]?.summary ?? ''),
   },
   {
     title: 'Add inspiration',
@@ -119,6 +121,8 @@ export function Tour({ prefill }: { prefill: (text: string) => void }) {
   const model = useStudio((s) => s.model)
   const tourDone = useStudio((s) => s.prefs.tourDone)
   const importing = useImport((s) => s.stage !== 'idle')
+  const dialog = useDialogs((s) => s.open)
+  const asking = useEditor((s) => !!s.confirm)
   const [rect, setRect] = useState<DOMRect | null>(null)
   const start = useRef<Snap>({ messages: 0, versions: 0, inspiration: 0 })
   // After the first plan comes in, the tour starts by itself (once).
@@ -133,7 +137,7 @@ export function Tour({ prefill }: { prefill: (text: string) => void }) {
     const s = useStudio.getState()
     start.current = { messages: s.messages.filter((m) => m.role === 'user').length, versions: s.versions.length, inspiration: s.model?.inspiration.length ?? 0 }
     STEPS[step]?.enter?.()
-    if (step === 1) prefill('Move the sink to the island')
+    if (step === 1) prefill(firstChange(s.model, s.roomId))
   }, [step])
   // Finish a step when the person does it.
   useEffect(() => {
@@ -151,15 +155,17 @@ export function Tour({ prefill }: { prefill: (text: string) => void }) {
     if (step === null) return setRect(null)
     let raf = 0
     const tick = () => {
-      const el = document.querySelector(STEPS[step].anchor)
-      const r = el?.getBoundingClientRect() ?? null
+      const el = document.querySelector(STEPS[step].anchor) as HTMLElement | null
+      const box = el && el.checkVisibility?.() !== false ? el.getBoundingClientRect() : null
+      const r = box && box.width > 0 && box.height > 0 ? box : null
       setRect((old) => (r && old && Math.abs(r.x - old.x) + Math.abs(r.y - old.y) + Math.abs(r.width - old.width) < 1 ? old : r))
       raf = requestAnimationFrame(tick)
     }
     tick()
     return () => cancelAnimationFrame(raf)
   }, [step])
-  if (step === null || !model) return null
+  // A dialog (Share, Export, Settings, a question about the as-built) goes on top; the tour waits behind it.
+  if (step === null || !model || dialog || asking) return null
   const s = STEPS[step]
   const card = place(rect)
   return (
@@ -196,18 +202,23 @@ function end() {
   void setPrefs({ tourDone: true })
 }
 
-/** Put the card beside what it points at, inside the window. */
+/** Put the card next to what it points at, never on top of it, and inside the window. */
 function place(r: DOMRect | null): React.CSSProperties {
   const W = 320
+  const H = 230 // about the tallest card
   if (!r) return { left: 24, bottom: 24, width: W }
   const vw = window.innerWidth
   const vh = window.innerHeight
-  // A big target (the plan): sit inside its lower left corner.
-  if (r.width > 500 && r.height > 300) return { left: Math.max(16, r.left + 16), top: Math.min(vh - 220, r.bottom - 220), width: W }
-  const right = r.right + 16 + W < vw
-  const left = right ? r.right + 16 : Math.max(16, r.left - W - 16)
-  const top = Math.min(vh - 220, Math.max(16, r.top - 20))
-  return { left, top, width: W }
+  const top = (y: number) => Math.min(vh - H - 16, Math.max(16, y))
+  // A big target (the plan): beside it in the column to its left, low down, so the plan stays clear.
+  if (r.width > 500 && r.height > 300) {
+    if (r.left >= W + 32) return { left: r.left - W - 20, top: top(r.bottom - H), width: W }
+    return { left: Math.max(16, r.left + 16), top: top(r.bottom - H), width: W }
+  }
+  // Something small: above it when there is room (the chat box), else to its right, else to its left.
+  if (r.top > H + 32) return { left: Math.min(vw - W - 16, Math.max(16, r.left)), top: r.top - H - 16, width: W }
+  if (r.right + 16 + W < vw) return { left: r.right + 16, top: top(r.top - 20), width: W }
+  return { left: Math.max(16, r.left - W - 16), top: top(r.top - 20), width: W }
 }
 
 export { openDialog }

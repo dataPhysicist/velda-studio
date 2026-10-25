@@ -1,7 +1,7 @@
 // Plan import, one sheet: page data (from the adapter) and the raster trace (from the worker) in, a
 // model v2 for that level and an ImportReport out. Pure, so it runs in vitest on recorded fixtures
 // and in the page on a fresh PDF. Spec: 05-plan-import-spec.
-import { deriveRooms, healWalls, updateDimensionStatus } from '../model/derive'
+import { bindCoordinate, deriveRooms, healWalls, updateDimensionStatus } from '../model/derive'
 import { pointInPolygon, polygonArea, polygonBounds, wallLength } from '../model/geom'
 import type { Dimension, Item, Level, Model, Opening, Prov, Room, Sheet, Vec, Wall } from '../model/types'
 import { emptyModel } from '../model/types'
@@ -256,6 +256,17 @@ export function importSheet(
   const unnamed = m.rooms.filter((r) => r.flags.includes('needs_name')).map((r) => r.name)
   const named = new Set(m.rooms.map((r) => r.name))
   const labelsWithoutRoom = labels.filter((l) => l.kind === 'room' && !named.has(roomName(l.text))).map((l) => `${roomName(l.text)}: the label is not inside a closed room (a wall is missing around it)`)
+  // Conflicts as the finished model has them (re-trimming corners after the solve can tip a string
+  // that just fit over the half-inch line), so the Confirm screen and the plan never disagree.
+  const conflicts = m.dimensions
+    .filter((d) => d.status === 'conflict')
+    .map((d) => {
+      const solved1 = solved.conflicts.find((c) => c.id === d.id)
+      const c0 = bindCoordinate(m, d, 0)
+      const c1 = bindCoordinate(m, d, 1)
+      const traced = c0 !== null && c1 !== null ? Math.round(Math.abs(c1 - c0) * 100) / 100 : (solved1?.traced ?? d.value)
+      return { dimension: d.text, drawn: d.value, traced, where: solved1?.where ?? ([(d.a[0] + d.b[0]) / 2, (d.a[1] + d.b[1]) / 2] as Vec) }
+    })
   const report: ImportReport = {
     sheets: [
       {
@@ -264,7 +275,7 @@ export function importSheet(
         level,
         scale: sheet.scale.text,
         tier: guess.tier,
-        dims: { parsed: dims.length, paired: scale.pairs, bound, conflicts: solved.conflicts.length },
+        dims: { parsed: dims.length, paired: scale.pairs, bound, conflicts: conflicts.length },
       },
     ],
     counts: {
@@ -275,7 +286,7 @@ export function importSheet(
       rooms: m.rooms.filter((r) => !r.flags.includes('needs_name')).length,
       stairs: m.stairs.length,
     },
-    conflicts: solved.conflicts.map((c) => ({ dimension: c.text, drawn: c.drawn, traced: c.traced, where: c.where })),
+    conflicts,
     unresolved: [...unresolvedDims, ...solved.unresolved.filter((u) => u.kind !== 'fixture').map((u) => `${u.text}: ${u.why}`), ...labelsWithoutRoom],
     fixtureStrings: solved.unresolved.filter((u) => u.kind === 'fixture').map((u) => u.text),
     unnamedRooms: unnamed,

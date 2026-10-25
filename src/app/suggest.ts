@@ -1,6 +1,7 @@
 // Suggested prompts (06 section 4): a few things to say, picked from where the person is. A check
 // that needs fixing comes first, then what fits the room in focus, then a general one. Pure.
 import type { Issue } from '../analysis/checks'
+import { pointInPolygon } from '../model/geom'
 import type { Model, Room } from '../model/types'
 
 const WET = /bath|powder|shower|wc/i
@@ -56,4 +57,24 @@ export function suggestions(s: SuggestInput, max = 4): string[] {
   }
   if (s.asBuilt) out.push('Record a wall I measured with a tape')
   return [...new Set(out)].slice(0, max)
+}
+
+/**
+ * One concrete change to try first (the tour's second step), about the room the person just clicked:
+ * the tub to a shower, a second sink, the kitchen sink to the island, or the room a foot bigger.
+ */
+export function firstChange(m: Model | null, roomId: string | null): string {
+  if (!m) return 'Move the sink to the island'
+  const the = (r: Room) => (/^(room|space|area)\b/i.test(r.name) ? r.name : `the ${r.name}`)
+  const room = roomId ? m.rooms.find((r) => r.id === roomId) : undefined
+  const has = (r: Room, kinds: string[]) => m.items.some((i) => i.level === r.level && kinds.includes(i.kind) && r.polygon.length >= 3 && pointInPolygon([i.x, i.y], r.polygon))
+  const kitchen = room && KITCHEN.test(room.name) ? room : m.rooms.find((r) => KITCHEN.test(r.name))
+  if (room) {
+    if (has(room, ['tub'])) return `Swap the tub in ${the(room)} for a walk-in shower`
+    if (KITCHEN.test(room.name) && has(room, ['sink']) && has(room, ['island'])) return 'Move the sink to the island'
+    if (has(room, ['vanity'])) return `Add a second sink to the vanity in ${the(room)}`
+    return `Make ${the(room)} 1'-0" bigger`
+  }
+  if (kitchen && has(kitchen, ['sink']) && has(kitchen, ['island'])) return 'Move the sink to the island'
+  return 'What would you change first?'
 }

@@ -8,7 +8,7 @@ import { diffModels } from '../model/diff'
 import { polygonBounds } from '../model/geom'
 import type { Badge, Model, Vec, Wall } from '../model/types'
 import { formatFeetInches } from '../model/units'
-import { levelOverall, openingShape, pts, roomClearDims, roomLabel, wallPoly } from '../plan2d/geometry'
+import { dimText, levelOverall, openingShape, pts, roomClearDims, roomLabel, wallPoly } from '../plan2d/geometry'
 
 export const BADGE_COLOR: Record<Badge | 'conflict', string> = {
   measured: '#23282c',
@@ -136,7 +136,7 @@ export function planSvg(m: Model, o: PlanSvgOpts): { svg: string; bounds: { x0: 
     const mid: Vec = [(d.a[0] + d.b[0]) / 2, (d.a[1] + d.b[1]) / 2]
     const vertical = Math.abs(d.b[1] - d.a[1]) > Math.abs(d.b[0] - d.a[0])
     out.push(line(d.a, d.b, col, 0.4))
-    out.push(text(vertical ? [mid[0] - 1.5, mid[1]] : [mid[0], mid[1] - 1.5], d.text, T * 0.62, col, { rotate: vertical }))
+    out.push(text(vertical ? [mid[0] - 1.5, mid[1]] : [mid[0], mid[1] - 1.5], dimText(m, d).text, T * 0.62, col, { rotate: vertical }))
   }
   // Every room's clear dimensions, colored by provenance.
   for (const r of rooms)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { plainError } from '../../src/app/errors'
-import { suggestions } from '../../src/app/suggest'
+import { firstChange, suggestions } from '../../src/app/suggest'
 import type { Issue } from '../../src/analysis/checks'
 import { deriveRooms } from '../../src/model/derive'
 import { twoRooms } from '../model/fixtures'
@@ -26,6 +26,23 @@ describe('suggested prompts', () => {
     const s = suggestions({ model, roomId: office.id, checks: [], asBuilt: true, recentInspiration: 'm1' }, 6)
     expect(s).toEqual(['Apply this look to the Office', 'What would you change in the Office?', 'Show this room realistically', 'Record a wall I measured with a tape'])
     expect(suggestions({ model: null, roomId: null, checks: [], asBuilt: false })).toEqual([]) // the welcome asks for a plan first
+  })
+})
+
+describe('the first change the tour offers', () => {
+  it('is about the room just clicked: its tub, its vanity, or the room itself', () => {
+    const model = deriveRooms(twoRooms())
+    const [a, b] = model.rooms
+    const c = (r: (typeof model.rooms)[0]) => {
+      const xs = r.polygon.map((p) => p[0])
+      const ys = r.polygon.map((p) => p[1])
+      return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 }
+    }
+    model.items.push({ id: 'tb', kind: 'tub', label: 'Tub', level: a.level, ...c(a), w: 60, d: 32, h: 20, rot: 0, elev: 0, prov: {} } as any)
+    expect(firstChange(model, a.id)).toBe(`Swap the tub in the ${a.name} for a walk-in shower`)
+    expect(firstChange(model, b.id)).toBe(`Make the ${b.name} 1'-0" bigger`)
+    expect(firstChange(model, null)).toBe('What would you change first?')
+    expect(firstChange(null, null)).toBe('Move the sink to the island')
   })
 })
 

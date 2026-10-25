@@ -4,6 +4,7 @@ import { polygonBounds, wallLength } from '../../src/model/geom'
 import { applyOps } from '../../src/model/ops'
 import { badgeOf } from '../../src/model/types'
 import { twoRooms, wall } from './fixtures'
+import { dimText } from '../../src/plan2d/geometry'
 
 const size = (m: ReturnType<typeof twoRooms>, name: string) => {
   const r = m.rooms.find((x) => x.name === name)!
@@ -169,6 +170,8 @@ describe('dimensions', () => {
     expect(m.dimensions[0].status).toBe('ok')
     const moved = applyOps(m, [{ op: 'move', id: 'mid', dx: 2 }], { author: 'user' })
     expect(moved.model.dimensions[0].status).toBe('conflict')
+    // The plan shows both numbers (06 section 3).
+    expect(dimText(moved.model, moved.model.dimensions[0]).text).toBe(`9'-7" drawn, 9'-9" now`)
   })
 })
 

@@ -96,4 +96,18 @@ describe('handoff checklist', () => {
     expect(lines.find((l) => /remodeled are named/.test(l.text))!.missing[0]).toMatch(/No rooms are marked/)
     expect(checklistMd(lines)).toMatch(/^- \[ \] Every level has a confirmed ceiling height and floor thickness\.\n  - Level 2: ceiling/)
   })
+  it('names doors by their rooms, and leaves a drawn dimension the design changed on purpose to the change log', () => {
+    const base = asBuilt()
+    const d = base.dimensions.find((x) => x.status === 'ok' && x.source === 'sheet' && x.binds.some((b) => b.kind === 'wall_face' && !base.walls.find((w) => w.id === b.id)?.exterior))!
+    const wall = d.binds.find((b) => b.kind === 'wall_face' && !base.walls.find((w) => w.id === b.id)?.exterior)!.id
+    const w = base.walls.find((x) => x.id === wall)!
+    const n = Math.abs(w.a[0] - w.b[0]) < 1 ? { dx: 6, dy: 0 } : { dx: 0, dy: 6 }
+    const scheme = applyOps(base, [{ op: 'move', id: wall, ...n }], { author: 'user' }).model
+    expect(scheme.dimensions.find((x) => x.id === d.id)!.status).toBe('conflict')
+    const line = (isAsBuilt: boolean) => checklist({ model: scheme, asBuilt: base, aside: new Set(), asBuiltEdits: [], isAsBuilt }).find((l) => /agrees with the walls/.test(l.text))!
+    expect(line(false).missing.some((t) => t.includes(d.text))).toBe(false) // a design change
+    expect(line(true).missing.some((t) => t.includes(d.text))).toBe(true) // on the record itself it is a question
+    const all = checklist({ model: scheme, asBuilt: base, aside: new Set(), asBuiltEdits: [], isAsBuilt: false }).flatMap((l) => [l.text, ...l.missing]).join('\n')
+    expect(all).not.toMatch(/\b\w*\d[a-z]+\d+[a-z]\w*\b/) // no ids like A2w30d1
+  })
 })

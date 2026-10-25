@@ -2,6 +2,7 @@
 // about. Shown in the Export dialog and written as README.md in the package. It never blocks an
 // export; each line says what is missing and points at the thing to fix.
 import { type Issue, runChecks } from '../analysis/checks'
+import { roomOf, roomsAcross } from '../analysis/space'
 import { badgeOf, type Model } from '../model/types'
 import { formatFeetInches } from '../model/units'
 
@@ -31,8 +32,20 @@ export function checklist(c: ChecklistInput): CheckLine[] {
     fix: defaults.length ? { kind: 'level', ids: defaults.map((l) => l.id) } : undefined,
   })
   // Dimensions in conflict.
-  const conflicts = m.dimensions.filter((d) => d.status === 'conflict')
-  out.push({ ok: !conflicts.length, text: 'No dimension is in conflict with the model.', missing: conflicts.map((d) => `${levelName(d.level)}: the drawing says ${d.text}`), fix: conflicts.length ? { kind: 'dimension', ids: conflicts.map((d) => d.id) } : undefined })
+  // On a proposed scheme, a drawn dimension the design changed on purpose (it holds on the as-built) is
+  // a change, not a question; the change log has it. Only disagreements the as-built has too count here.
+  const heldOnAsBuilt = new Set(!c.isAsBuilt && c.asBuilt ? c.asBuilt.dimensions.filter((d) => d.status === 'ok').map((d) => d.id) : [])
+  const conflicts = m.dimensions.filter((d) => d.status === 'conflict' && !heldOnAsBuilt.has(d.id))
+  const near = (level: string, a: [number, number], b: [number, number]) => roomOf(m, level, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2])?.name
+  out.push({
+    ok: !conflicts.length,
+    text: 'Every dimension on the drawing agrees with the walls.',
+    missing: conflicts.map((d) => {
+      const room = near(d.level, d.a, d.b)
+      return `${levelName(d.level)}: the drawing says ${d.text}${room ? ` in the ${room}` : ''}, but the walls there do not match it`
+    }),
+    fix: conflicts.length ? { kind: 'dimension', ids: conflicts.map((d) => d.id) } : undefined,
+  })
   // Window heights.
   const wallLevel = (id: string) => m.walls.find((w) => w.id === id)?.level ?? ''
   const windows = m.openings.filter((o) => o.kind === 'window' && (badgeOf(o.prov.h) === 'assumed' || badgeOf(o.prov.sill) === 'assumed'))
@@ -44,7 +57,11 @@ export function checklist(c: ChecklistInput): CheckLine[] {
   })
   // Door swings.
   const noSwing = m.openings.filter((o) => o.kind === 'door' && ['swing', 'french'].includes(o.style) && !o.swing)
-  out.push({ ok: !noSwing.length, text: 'Every swinging door has a swing.', missing: noSwing.map((o) => `${o.id} on ${levelName(wallLevel(o.wall))}`), fix: noSwing.length ? { kind: 'opening', ids: noSwing.map((o) => o.id) } : undefined })
+  out.push({ ok: !noSwing.length, text: 'Every swinging door has a swing.', missing: noSwing.map((o) => {
+      const rooms = roomsAcross(m, o).filter((r) => !!r).map((r) => r!.name)
+      const where = rooms.length === 2 ? `between the ${rooms[0]} and the ${rooms[1]}` : rooms.length ? `into the ${rooms[0]}` : 'on an outside wall'
+      return `The ${formatFeetInches(o.w)} door ${where} (${levelName(wallLevel(o.wall))})`
+    }), fix: noSwing.length ? { kind: 'opening', ids: noSwing.map((o) => o.id) } : undefined })
   // Blocking checks.
   const issues: Issue[] = runChecks(m, { asBuilt: c.asBuilt })
   const blocks = issues.filter((i) => i.severity === 'blocks')
