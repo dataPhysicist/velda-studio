@@ -78,6 +78,15 @@ Where Playwright's Chromium download is blocked (this build sandbox), set `PW_CH
 - 2026-10-25 What Velda sees: every room in one line, and full detail for at most three rooms (the focused one, rooms the message names, rooms holding fixtures the message names). The whole migrated house is under 6 KB.
 - 2026-10-25 Chat: Velda's reply is replaced by a plain "I could not apply that" when none of its ops applied, and partial results say what was not done; Velda hears the skipped ops next turn. On the as-built, the branch to a new scheme happens only once the ops apply, so a failed request leaves no empty copy. Messages gained a `meta` column (option cards, research) on the test copy.
 - 2026-10-25 Checks set aside (dismissed notes, acknowledged engineer cautions) are kept per scheme in the settings table (`checks_aside:<scheme id>`).
+- 2026-10-25 Pinterest comes in through Pinterest's public widget endpoints, read from the page (`widgets.pinterest.com/v3/pidgets/pins/info` for a pin, `.../boards/<user>/<board>/pins/` for a board, which gives up to 50 pins), not by crawling: Velda's crawl fails on Pinterest pages, and the widget answers the page directly. A board that gives back fewer than 5 pictures says it may be private; a `pin.it` short link asks for the full link. No Pinterest sign-in.
+- 2026-10-25 Colors are measured, never guessed. The page measures pictures it holds (files, chat photos) with its own quantizer (median cut, then k-means for true shares). It can show Pinterest pictures but not read their pixels, and the page preview cannot call `execute_code` itself ("Failed to execute public tool"), so the tagging request asks Velda to run the same quantizer in her sandbox (Deno with jpeg-js) on the web pictures and copy its output back. Each color Velda names snaps to the nearest measured color within an RGB distance of 40 and keeps her name; a color nothing measured comes near is dropped; with none left, the measured colors stand unnamed.
+- 2026-10-25 Inspiration cards are records, like notes: adding, filing or retitling them on the as-built saves a version there without branching. A theme made from them is a design change and branches.
+- 2026-10-25 Tagging runs at most 8 pictures per Velda call, in batches of even size, three calls at a time (a 9-pin board is 5 and 4 together). A picture dragged from another tab arrives as its address and is measured like a pin.
+- 2026-10-25 When Velda's change on the as-built goes to a new scheme, the as-built chat gets one line naming that scheme and the new scheme's chat starts with the request. The chat shows inspiration cards by title; Velda's prompt also carries their ids.
+- 2026-10-25 Render references: up to 4 of the room's inspiration pictures, those sharing the most colors with the room's theme first (the cards the theme came from), then the theme's own images, then any Velda names; 6 at most.
+- 2026-10-25 Shower fit (`src/library/fit.ts`): each type in `src/library/showers.json` is tried in each corner of the room, on wall stretches clear of doors and their swings, with its depth checked to the facing wall and 2'-0" clear in front; a wet room is judged by the room's size; a steam shower needs a ceiling of 8'-0" or less. Velda's prompt lists only the types that fit, and only when the talk is about a shower, tub or bath fixture.
+- 2026-10-25 A placed product takes a short name (the part of its title before a comma, dash or bracket, at most 48 characters at a word break). Check messages keep a product name's capitals.
+- 2026-10-25 Corrected: `scripts/release.sh` had not been committing source since the `schema` folder went away (one missing path makes `git add` stage nothing), so builds were made from the working tree with the source committed by hand or not at all. Build 596819d's source was committed after the fact as 2c34aba and rebuilt to the same bytes; the script now stages only paths that exist.
 
 ## 2026-10-18  Phase 0  commit eaa8f33 (dev release, build 5f119ff)
 
@@ -236,3 +245,42 @@ Open:
 Decisions N8 needs: none.
 
 Next: Phase 6, inspiration, themes and the fixture library (images, Pinterest pins and boards, product links, the Inspiration panel, mood board, theme from a selection, the shower library, `research` through Velda).
+
+## 2026-10-25  Phase 6  commits d086a5f to f317d10 (dev releases, builds 62bfe53 and 596819d)
+
+Done:
+- Inspiration in (`src/inspiration/`): pictures dropped or pasted in the chat box or the Inspiration tab, picture addresses, Pinterest pins and boards, and any other page (Velda reads it). Each becomes a card filed under the focused room; a board becomes a board card plus one card per picture. Velda tags them (title, style, materials, fixtures, palette, one line on what to take from it) on the deeper model; palettes are measured (decisions above).
+- Inspiration tab (`src/app/InspirationPanel.tsx`): drop zone and link box, filter by room (or "Not filed yet") and by tag, cards with picture, source, swatches and tags; drag a card onto a room in the plan to file it there too; pick cards and "Make a theme from these", which asks Velda for a theme with a role for each color, materials, an avoid list, and applies it to the room.
+- Mood board (`src/app/MoodBoard.tsx`): the room's theme colors with names, roles and hex values, materials, what to avoid, and its pictures with where each came from; Print shows only the board.
+- Shower library and fit (`src/library/showers.json`, `fit.ts`): alcove, walk-in, curbless, neo-angle, double, steam, wet room, tub and shower. Products Velda finds through `research` come back as cards with picture, size, price and link; Place puts one where the fit found room for that type.
+- Renders take the room's inspiration pictures and theme as references (07 section 8).
+
+Evidence:
+- `npm run check` green inside `scripts/release.sh`: 131 unit tests in 15 files (new: `tests/inspiration/pinterest.test.ts` on saved widget answers for one public pin and one public board, scrubbed of names, plus the quantizer; `tests/inspiration/ingest.test.ts` 8; `tests/library/fit.test.ts` 5, the A2 primary bath polygon fits every type but steam at its 9'-0" ceiling; `tests/model/units.test.ts` 2), 10 browser tests (new `tests/e2e/inspiration.spec.ts`: three pictures in the chat box and a board link in the tab become 13 tagged cards in two versions, filters, three picked cards become the room's theme in a new scheme whose chat starts with the request, the mood board, a card dragged onto the Primary Bedroom files it there).
+- In the Toolbelt page (signed preview in the built-in browser, builds 62bfe53 then 596819d, test copy `velda_studio_dev.duckdb`), on the imported A2 "As-built" scheme's Primary Bathroom, with the real Velda:
+  - Three Pinterest pictures dropped on the Inspiration tab by address: 57 s, three tagged cards in one version ("Inspiration for Primary Bathroom (3 pictures)"), each with five colors measured in Velda's sandbox, for example "Rustic oak vanity with matte black fixtures": #dad0c4 25%, #b0a598 22%, #584937 21%, #7b736a 16%, #292117 16%.
+  - The public board "marble Shower Tray finish anti-slip" pasted in the link box: a board card and 9 pin cards in 153 s (two calls, one after the other, before the parallel change), every pin measured in the sandbox, every palette color one of its measured colors; one version.
+  - Five cards picked, "Make a theme from these": 32 s. Velda made "Warm Oak and Honed Marble": 9 colors with roles, every one a measured color from the picked cards (walls #e5dfdb from the vaulted bath, cabinets #584937 from the rustic vanity, counters #e2e3e4 from the Calacatta tray, floors #d4cab9 from the curbless shower), 9 materials, an avoid list and lighting. It went to a new scheme, "Warm oak and marble bath theme"; the as-built is unchanged. `docs/buildlog/phase6-toolbelt-inspiration.jpg`, `phase6-toolbelt-mood-board.jpg`.
+  - "find me the best shower for this bathroom" on the as-built: 143 s with Velda's web research. Her pick is a 6'-0" x 3'-6" curbless walk-in, with a 5'-0" x 3'-0" alcove as the cheaper choice; she pointed out that both windows sit in that corner and that a curbless floor on level 2 needs the joists confirmed. Two products for each of the three types she offered: curbless (Redi Trench 42 x 72 pan, $1,054; Schluter Kerdi-Shower-LT 36 x 72, $354.43), walk-in (Royal Bath ERASTONE 72 x 42; Schluter Kerdi-Shower-Kit 48 x 72, $820.48), alcove (Kohler Salient 60 x 36; Swanstone SS-3660, $1,031). All three types are ones the fit finds for this room; nothing on the as-built changed. `phase6-toolbelt-shower-products.jpg`.
+  - Place on the Royal Bath base: the as-built question, "Make a new scheme", then the 6'-0" x 3'-6" base in the room's top left corner; the checker noted the window within 5'-0" needs tempered glass.
+  - In the theme scheme, "Lay out this bath: a 6 ft double vanity, a 6 by 3 1/2 ft curbless shower with a fixed glass panel, and a toilet, kept clear of the windows": 72 s, one version, and Velda's check run found no problems. "Render the primary bath realistically from this view" from the 3D view: 77 s at best quality. The references were the four cards the theme came from (the vaulted bath, the rustic oak vanity, the Calacatta tray, the curbless shower), and the render shows them: oak double vanity, matte black faucets and globe sconces, white marble herringbone in a gray marble frame, a linear drain and a cream marble floor. `phase6-toolbelt-render.jpg`, `phase6-toolbelt-render-in-chat.jpg`.
+- Found in the page and fixed in 596819d:
+  - One card's palette came back empty because Velda's named colors were a little off the measured ones (now snapped).
+  - The board's pictures were tagged one call after another (now three at a time, in even batches).
+  - The as-built chat kept the theme request with no answer (now it says where the change went).
+  - Velda's reply and the app both said "in a new scheme" (now only once).
+  - The chat bubble showed card ids.
+  - A placed product's name was cut mid-word ("... shower base, o") and lowercased in a check ("royal Bath").
+  - "Make a new scheme" from a hand edit named it "Option 1" (now named from the change).
+  - The mood board showed only the first color for each role.
+
+Open:
+- Times in the page: three pictures about a minute; a 9-picture board 2 1/2 minutes before the parallel change (not yet re-timed); a theme about half a minute; a shower search with products 2 1/2 minutes.
+- Place uses the first corner the fit finds. Velda had suggested the top right corner; she cannot yet say which corner when she lists products.
+- Some products come without a picture (Redi Trench, Schluter LT): the card shows a blank tile.
+- The render's camera is the 3D view from above (walking to a good spot inside the room takes practice). Renders are not yet labeled "mood, not dimensions"; Phase 7 does that and records cost per render.
+- Test schemes made on the test copy during this run: "Warm oak and marble bath theme" and "Option 1" (the placed shower base).
+
+Decisions N8 needs: none.
+
+Next: Phase 7, renders: the prompt built from theme, inspiration and camera; the best quality path; labels; one before and after of the primary bath from the current 3D view; cost per render.
