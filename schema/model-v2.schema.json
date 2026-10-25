@@ -1,0 +1,1307 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/dataPhysicist/velda-studio/blob/main/schema/model-v2.schema.json",
+  "title": "Velda Studio model v2",
+  "description": "One scheme of a house: levels, walls, openings, rooms, fixtures, stairs, the drawing dimensions, inspiration and themes. Inches, plan frame (x right, y down the sheet). Generated from src/model/types.ts by npm run schema.",
+  "$ref": "#/definitions/Model",
+  "definitions": {
+    "Anchor": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "type": "number"
+        },
+        "side": {
+          "enum": [
+            "left",
+            "right"
+          ],
+          "type": "string"
+        },
+        "wall": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "wall",
+        "at",
+        "side"
+      ],
+      "type": "object"
+    },
+    "Bearing": {
+      "enum": [
+        "yes",
+        "no",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "DimBind": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "wall_face",
+            "wall_center",
+            "opening_edge"
+          ],
+          "type": "string"
+        },
+        "which": {
+          "enum": [
+            "a",
+            "b",
+            "left",
+            "right"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "which"
+      ],
+      "type": "object"
+    },
+    "Dimension": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "$ref": "#/definitions/Vec"
+        },
+        "b": {
+          "$ref": "#/definitions/Vec"
+        },
+        "binds": {
+          "items": {
+            "$ref": "#/definitions/DimBind"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "level": {
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "sheet",
+            "field",
+            "user",
+            "auto"
+          ],
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "conflict",
+            "unresolved"
+          ],
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "level",
+        "a",
+        "b",
+        "value",
+        "text",
+        "source",
+        "status",
+        "binds"
+      ],
+      "type": "object"
+    },
+    "Finish": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "type": "string"
+        },
+        "library": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Inspiration": {
+      "additionalProperties": false,
+      "properties": {
+        "addedBy": {
+          "enum": [
+            "user",
+            "ai"
+          ],
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "image",
+            "pin",
+            "board",
+            "product",
+            "url",
+            "color"
+          ],
+          "type": "string"
+        },
+        "parent": {
+          "type": "string"
+        },
+        "rooms": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sampled": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "hex": {
+                "type": "string"
+              },
+              "share": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "hex",
+              "share"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "source": {
+          "type": "string"
+        },
+        "tags": {
+          "additionalProperties": false,
+          "properties": {
+            "fixtures": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "materials": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "notes": {
+              "type": "string"
+            },
+            "palette": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "hex": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "hex"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "style": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "style",
+            "palette",
+            "materials",
+            "fixtures"
+          ],
+          "type": "object"
+        },
+        "thumb": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "tags",
+        "rooms",
+        "addedBy",
+        "createdAt"
+      ],
+      "type": "object"
+    },
+    "Item": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "$ref": "#/definitions/Anchor"
+        },
+        "catalog": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string"
+        },
+        "d": {
+          "type": "number"
+        },
+        "demolish": {
+          "type": "boolean"
+        },
+        "h": {
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ItemKind"
+        },
+        "label": {
+          "type": "string"
+        },
+        "level": {
+          "type": "string"
+        },
+        "product": {
+          "additionalProperties": false,
+          "properties": {
+            "glbBlobId": {
+              "type": "string"
+            },
+            "image": {
+              "type": "string"
+            },
+            "price": {
+              "type": "number"
+            },
+            "sku": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "vendor": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "props": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "prov": {
+          "$ref": "#/definitions/Prov"
+        },
+        "rot": {
+          "type": "number"
+        },
+        "w": {
+          "type": "number"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "level",
+        "kind",
+        "label",
+        "x",
+        "y",
+        "rot",
+        "w",
+        "d",
+        "h",
+        "prov"
+      ],
+      "type": "object"
+    },
+    "ItemKind": {
+      "enum": [
+        "base_cabinet",
+        "island",
+        "vanity",
+        "sink",
+        "range",
+        "cooktop",
+        "dishwasher",
+        "fridge",
+        "oven_tower",
+        "tall_cabinet",
+        "wall_cabinet",
+        "hood",
+        "tub",
+        "shower",
+        "toilet",
+        "bench",
+        "glass",
+        "beam",
+        "item",
+        "stove",
+        "washer",
+        "dryer",
+        "water_heater",
+        "hvac",
+        "closet_rod",
+        "shelf",
+        "bed",
+        "table",
+        "sofa",
+        "chair",
+        "desk",
+        "rug",
+        "lamp",
+        "plant",
+        "mirror"
+      ],
+      "type": "string"
+    },
+    "Level": {
+      "additionalProperties": false,
+      "properties": {
+        "ceiling": {
+          "type": "number"
+        },
+        "elev": {
+          "type": "number"
+        },
+        "floorThickness": {
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "prov": {
+          "additionalProperties": false,
+          "properties": {
+            "ceiling": {
+              "$ref": "#/definitions/Prov"
+            },
+            "floorThickness": {
+              "$ref": "#/definitions/Prov"
+            }
+          },
+          "required": [
+            "ceiling",
+            "floorThickness"
+          ],
+          "type": "object"
+        },
+        "sheetIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "elev",
+        "ceiling",
+        "floorThickness",
+        "sheetIds",
+        "prov"
+      ],
+      "type": "object"
+    },
+    "Model": {
+      "additionalProperties": false,
+      "properties": {
+        "dimensions": {
+          "items": {
+            "$ref": "#/definitions/Dimension"
+          },
+          "type": "array"
+        },
+        "inspiration": {
+          "items": {
+            "$ref": "#/definitions/Inspiration"
+          },
+          "type": "array"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/definitions/Item"
+          },
+          "type": "array"
+        },
+        "levels": {
+          "items": {
+            "$ref": "#/definitions/Level"
+          },
+          "type": "array"
+        },
+        "meta": {
+          "additionalProperties": false,
+          "properties": {
+            "createdFrom": {
+              "type": "string"
+            },
+            "migratedFrom": {
+              "const": 1,
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "notes": {
+          "items": {
+            "$ref": "#/definitions/Note"
+          },
+          "type": "array"
+        },
+        "openings": {
+          "items": {
+            "$ref": "#/definitions/Opening"
+          },
+          "type": "array"
+        },
+        "project": {
+          "$ref": "#/definitions/Project"
+        },
+        "rooms": {
+          "items": {
+            "$ref": "#/definitions/Room"
+          },
+          "type": "array"
+        },
+        "sheets": {
+          "items": {
+            "$ref": "#/definitions/Sheet"
+          },
+          "type": "array"
+        },
+        "stairs": {
+          "items": {
+            "$ref": "#/definitions/Stair"
+          },
+          "type": "array"
+        },
+        "theme": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "themes": {
+          "additionalProperties": {
+            "$ref": "#/definitions/Theme"
+          },
+          "type": "object"
+        },
+        "units": {
+          "const": "in",
+          "type": "string"
+        },
+        "v": {
+          "const": 2,
+          "type": "number"
+        },
+        "walls": {
+          "items": {
+            "$ref": "#/definitions/Wall"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "v",
+        "units",
+        "project",
+        "levels",
+        "sheets",
+        "walls",
+        "openings",
+        "rooms",
+        "items",
+        "stairs",
+        "dimensions",
+        "inspiration",
+        "theme",
+        "themes",
+        "notes",
+        "meta"
+      ],
+      "type": "object"
+    },
+    "Note": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "additionalProperties": false,
+          "properties": {
+            "level": {
+              "type": "string"
+            },
+            "p": {
+              "$ref": "#/definitions/Vec"
+            }
+          },
+          "required": [
+            "level",
+            "p"
+          ],
+          "type": "object"
+        },
+        "author": {
+          "enum": [
+            "user",
+            "ai"
+          ],
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "author",
+        "createdAt"
+      ],
+      "type": "object"
+    },
+    "Opening": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "type": "number"
+        },
+        "h": {
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/OpeningKind"
+        },
+        "label": {
+          "type": "string"
+        },
+        "panels": {
+          "type": "number"
+        },
+        "prov": {
+          "additionalProperties": false,
+          "properties": {
+            "at": {
+              "$ref": "#/definitions/Prov"
+            },
+            "h": {
+              "$ref": "#/definitions/Prov"
+            },
+            "sill": {
+              "$ref": "#/definitions/Prov"
+            },
+            "swing": {
+              "$ref": "#/definitions/Prov"
+            },
+            "w": {
+              "$ref": "#/definitions/Prov"
+            }
+          },
+          "required": [
+            "at",
+            "w",
+            "h"
+          ],
+          "type": "object"
+        },
+        "shape": {
+          "enum": [
+            "rectangle",
+            "arch"
+          ],
+          "type": "string"
+        },
+        "sill": {
+          "type": "number"
+        },
+        "style": {
+          "$ref": "#/definitions/OpeningStyle"
+        },
+        "swing": {
+          "$ref": "#/definitions/Swing"
+        },
+        "w": {
+          "type": "number"
+        },
+        "wall": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "wall",
+        "kind",
+        "at",
+        "w",
+        "h",
+        "style",
+        "prov"
+      ],
+      "type": "object"
+    },
+    "OpeningKind": {
+      "enum": [
+        "door",
+        "window",
+        "opening",
+        "garage"
+      ],
+      "type": "string"
+    },
+    "OpeningStyle": {
+      "enum": [
+        "swing",
+        "pocket",
+        "sliding",
+        "french",
+        "bifold",
+        "barn",
+        "fixed",
+        "casement",
+        "double_hung",
+        "slider",
+        "cased"
+      ],
+      "type": "string"
+    },
+    "PaletteEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "hex": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "use": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "hex"
+      ],
+      "type": "object"
+    },
+    "Project": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "era": {
+          "type": "string"
+        },
+        "front": {
+          "enum": [
+            "top",
+            "right",
+            "bottom",
+            "left",
+            null
+          ],
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "north": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "remodelRooms": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "north",
+        "front",
+        "remodelRooms"
+      ],
+      "type": "object"
+    },
+    "Prov": {
+      "additionalProperties": false,
+      "properties": {
+        "conf": {
+          "type": "number"
+        },
+        "note": {
+          "type": "string"
+        },
+        "src": {
+          "$ref": "#/definitions/ProvSrc"
+        }
+      },
+      "required": [
+        "src"
+      ],
+      "type": "object"
+    },
+    "ProvSrc": {
+      "enum": [
+        "sheet_dim",
+        "sheet_vector",
+        "sheet_raster",
+        "field",
+        "user",
+        "default",
+        "ai",
+        "derived"
+      ],
+      "type": "string"
+    },
+    "Room": {
+      "additionalProperties": false,
+      "properties": {
+        "ceiling": {
+          "type": "number"
+        },
+        "explicit": {
+          "type": "boolean"
+        },
+        "flags": {
+          "items": {
+            "$ref": "#/definitions/RoomFlag"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "labelAt": {
+          "$ref": "#/definitions/Vec"
+        },
+        "level": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "polygon": {
+          "items": {
+            "$ref": "#/definitions/Vec"
+          },
+          "type": "array"
+        },
+        "prov": {
+          "$ref": "#/definitions/Prov"
+        },
+        "theme": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "level",
+        "name",
+        "polygon",
+        "flags",
+        "prov"
+      ],
+      "type": "object"
+    },
+    "RoomFlag": {
+      "enum": [
+        "needs_confirming",
+        "to_be_demolished",
+        "wet",
+        "needs_name",
+        "open_outline"
+      ],
+      "type": "string"
+    },
+    "Sheet": {
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "level": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "page": {
+          "type": "number"
+        },
+        "raster": {
+          "additionalProperties": false,
+          "properties": {
+            "blobId": {
+              "type": "string"
+            },
+            "px": {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "pxPerInch": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "blobId",
+            "px",
+            "pxPerInch"
+          ],
+          "type": "object"
+        },
+        "role": {
+          "enum": [
+            "asbuilt",
+            "proposed",
+            "reference"
+          ],
+          "type": "string"
+        },
+        "scale": {
+          "additionalProperties": false,
+          "properties": {
+            "ptPerInch": {
+              "type": "number"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "ptPerInch",
+            "text"
+          ],
+          "type": "object"
+        },
+        "tints": {
+          "items": {
+            "$ref": "#/definitions/Tint"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        },
+        "toHouse": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 6,
+          "minItems": 6,
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "file",
+        "page",
+        "title",
+        "role",
+        "level",
+        "scale",
+        "raster",
+        "toHouse",
+        "tints"
+      ],
+      "type": "object"
+    },
+    "Stair": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "level": {
+          "type": "string"
+        },
+        "polygon": {
+          "items": {
+            "$ref": "#/definitions/Vec"
+          },
+          "type": "array"
+        },
+        "prov": {
+          "$ref": "#/definitions/Prov"
+        },
+        "risers": {
+          "type": "number"
+        },
+        "toLevel": {
+          "type": "string"
+        },
+        "up": {
+          "$ref": "#/definitions/Vec"
+        }
+      },
+      "required": [
+        "id",
+        "level",
+        "toLevel",
+        "polygon",
+        "up",
+        "prov"
+      ],
+      "type": "object"
+    },
+    "Swing": {
+      "additionalProperties": false,
+      "properties": {
+        "hinge": {
+          "enum": [
+            "a",
+            "b"
+          ],
+          "type": "string"
+        },
+        "side": {
+          "enum": [
+            "left",
+            "right"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "hinge",
+        "side"
+      ],
+      "type": "object"
+    },
+    "Theme": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/definitions/ThemeData"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "data"
+      ],
+      "type": "object"
+    },
+    "ThemeData": {
+      "additionalProperties": false,
+      "properties": {
+        "avoid": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "description": {
+          "type": "string"
+        },
+        "finishes": {
+          "additionalProperties": false,
+          "properties": {
+            "accent": {
+              "$ref": "#/definitions/Finish"
+            },
+            "cabinets": {
+              "$ref": "#/definitions/Finish"
+            },
+            "counters": {
+              "$ref": "#/definitions/Finish"
+            },
+            "floors": {
+              "$ref": "#/definitions/Finish"
+            },
+            "island": {
+              "$ref": "#/definitions/Finish"
+            },
+            "metal": {
+              "$ref": "#/definitions/Finish"
+            },
+            "trim": {
+              "$ref": "#/definitions/Finish"
+            },
+            "walls": {
+              "$ref": "#/definitions/Finish"
+            }
+          },
+          "type": "object"
+        },
+        "images": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "lighting": {
+          "additionalProperties": false,
+          "properties": {
+            "cct": {
+              "type": "string"
+            },
+            "rules": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "materials": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "choice": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "category",
+              "choice"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "palette": {
+          "items": {
+            "$ref": "#/definitions/PaletteEntry"
+          },
+          "type": "array"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "palette"
+      ],
+      "type": "object"
+    },
+    "Tint": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "demolish",
+            "confirm",
+            "other"
+          ],
+          "type": "string"
+        },
+        "polygon": {
+          "items": {
+            "$ref": "#/definitions/Vec"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "polygon"
+      ],
+      "type": "object"
+    },
+    "Vec": {
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "Wall": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "$ref": "#/definitions/Vec"
+        },
+        "b": {
+          "$ref": "#/definitions/Vec"
+        },
+        "bearing": {
+          "$ref": "#/definitions/Bearing"
+        },
+        "demolish": {
+          "type": "boolean"
+        },
+        "exterior": {
+          "type": "boolean"
+        },
+        "h": {
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/WallKind"
+        },
+        "level": {
+          "type": "string"
+        },
+        "prov": {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "$ref": "#/definitions/Prov"
+            },
+            "b": {
+              "$ref": "#/definitions/Prov"
+            },
+            "t": {
+              "$ref": "#/definitions/Prov"
+            }
+          },
+          "required": [
+            "a",
+            "b",
+            "t"
+          ],
+          "type": "object"
+        },
+        "t": {
+          "type": "number"
+        },
+        "tMeasured": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "level",
+        "a",
+        "b",
+        "t",
+        "kind",
+        "exterior",
+        "bearing",
+        "prov"
+      ],
+      "type": "object"
+    },
+    "WallKind": {
+      "enum": [
+        "wall",
+        "glass",
+        "half",
+        "rail"
+      ],
+      "type": "string"
+    }
+  }
+}

@@ -48,7 +48,7 @@ If GitHub cannot be reached within 2.5 s it loads the `FALLBACK` commit written 
     npm run dev
     npm run check   # types, unit tests, timing budgets, browser tests
 
-`npm run test:import` runs the A2 acceptance test alone. The browser tests need Chromium (set `PW_CHROMIUM_PATH` where Playwright's own download is blocked) and Python with `ezdxf` and `pymupdf` for the export checks. The build is tracked in `docs/build-log.md`.
+`npm run test:import` runs the A2 acceptance test alone. The browser tests need Chromium (set `PW_CHROMIUM_PATH` where Playwright's own download is blocked) and Python with `ezdxf`, `pymupdf` and `jsonschema` for the export checks. The build is tracked in `docs/build-log.md`.
 
 ## Licenses
 

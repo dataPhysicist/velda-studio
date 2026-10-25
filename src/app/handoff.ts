@@ -136,6 +136,9 @@ export async function buildParts(c: Context, sel: Set<PartKey>, opts: { size?: '
   if (sel.has('json')) {
     out.push({ path: 'model.json', blob: new Blob([JSON.stringify(c.model, null, 1)], { type: 'application/json' }) })
     if (c.asBuilt && !c.isAsBuilt) out.push({ path: 'as-built.json', blob: new Blob([JSON.stringify(c.asBuilt.model, null, 1)], { type: 'application/json' }) })
+    // What every field means and its type (08 section 5), for the software that reads model.json.
+    const { default: schema } = await import('../../schema/model-v2.schema.json')
+    out.push({ path: 'model-v2.schema.json', blob: new Blob([JSON.stringify(schema, null, 1)], { type: 'application/schema+json' }) })
   }
   if (sel.has('glb')) {
     say('Building the 3D model')

@@ -23,8 +23,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install the DXF and PDF checkers the export tests use
-        run: pip install ezdxf==1.4.5 pymupdf==1.28.2
+      - name: Install the DXF, PDF and schema checkers the export tests use
+        run: pip install ezdxf==1.4.5 pymupdf==1.28.2 jsonschema==4.26.0
       - name: Install Chromium for the browser tests
         run: npx playwright install --with-deps chromium
       - name: Type-check, unit tests, browser tests

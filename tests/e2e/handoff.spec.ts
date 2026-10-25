@@ -80,6 +80,7 @@ test('handoff: the export package has every part, and a share link can be made a
       'dxf/option-1.dxf',
       'model.json',
       'as-built.json',
+      'model-v2.schema.json',
       'model.glb',
       'schedules/rooms.csv',
       'schedules/doors.csv',

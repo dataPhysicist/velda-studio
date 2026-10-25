@@ -16,6 +16,7 @@
     "test:import": "vitest run tests/import",
     "test:e2e": "playwright test",
     "test:perf": "PERF=1 vitest run tests/perf",
+    "schema": "npx -y ts-json-schema-generator@2.4.0 --path src/model/types.ts --type Model --no-type-check -o schema/model-v2.schema.json",
     "check": "npm run typecheck && npm run test:unit && npm run test:perf && npm run test:e2e"
   },
   "dependencies": {
