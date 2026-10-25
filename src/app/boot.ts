@@ -39,6 +39,10 @@ export async function boot() {
     editor: () => import('./editor'),
     // Clear-space geometry (what the checker measures with), for test setup.
     space: () => import('../analysis/space'),
+    // Exports (sheets, DXF, schedules, change log), for the browser tests and the console.
+    exports: () => import('../export'),
+    // Model ops and room edges, for test setup.
+    ops: () => Promise.all([import('../model/ops'), import('../model/place')]).then(([ops, place]) => ({ ...ops, ...place })),
   }
   try {
     await repo.init()

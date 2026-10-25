@@ -63,7 +63,7 @@ export function planSvg(m: Model, o: PlanSvgOpts): { svg: string; bounds: { x0: 
   const line = (p: Vec, q: Vec, stroke: string, sw: number, dash?: string) =>
     `<line x1="${n2(p[0])}" y1="${n2(p[1])}" x2="${n2(q[0])}" y2="${n2(q[1])}" stroke="${stroke}" stroke-width="${sw}"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`
   const text = (at: Vec, s: string, size: number, fill: string, opts: { rotate?: boolean; weight?: string; anchor?: string } = {}) =>
-    `<text x="${n2(at[0])}" y="${n2(at[1])}" font-family="Helvetica" font-size="${n2(size)}" fill="${fill}" text-anchor="${opts.anchor ?? 'middle'}"${opts.weight ? ` font-weight="${opts.weight}"` : ''}${opts.rotate ? ` transform="rotate(-90 ${n2(at[0])} ${n2(at[1])})"` : ''}>${esc(s)}</text>`
+    `<text x="${n2(at[0])}" y="${n2(at[1])}" font-family="helvetica" font-size="${n2(size)}" fill="${fill}" text-anchor="${opts.anchor ?? 'middle'}"${opts.weight ? ` font-weight="${opts.weight}"` : ''}${opts.rotate ? ` transform="rotate(-90 ${n2(at[0])} ${n2(at[1])})"` : ''}>${esc(s)}</text>`
 
   const walls = m.walls.filter((x) => x.level === L)
   const rooms = m.rooms.filter((r) => r.level === L && r.polygon.length >= 3)
