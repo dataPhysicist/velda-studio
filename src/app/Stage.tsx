@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { Box3, Vector3 } from 'three'
 import { sunDirection } from '../view3d/sun'
 import { clearSelection, select } from './editor'
-import { type SelKind, focusOn, useStudio } from './store'
+import { type SelKind, computeFocus, focusOn, useStudio } from './store'
 import { WalkControls } from './Walk'
 import { CaptureLayer, Snapshotter } from './ViewerExtras'
 
@@ -71,7 +71,9 @@ function Controls() {
         ? c.setLookAt(center.x, center.y + span * 1.35, center.z + 0.001, center.x, center.y, center.z, true)
         : // Three-quarter view from the south-east at 35 degrees, looking down into the cut-away rooms.
           (() => {
-            const d = span * 1.15 + 2
+            // Floors spread apart stand taller than the house: step back to keep them in view.
+            const apart = useStudio.getState().look.levels === 'exploded' && !focus.levelId
+            const d = (span * 1.15 + 2) * (apart ? 1.6 : 1)
             const el = (35 * Math.PI) / 180
             const h = Math.cos(el)
             return c.setLookAt(center.x + d * h * 0.59, center.y + d * Math.sin(el), center.z + d * h * 0.81, center.x, center.y, center.z, true)
@@ -184,6 +186,20 @@ function Sun() {
   return <directionalLight position={[dir[0] * 40, dir[1] * 40, dir[2] * 40]} intensity={light === 'morning' ? 2.4 : 2.1} color={light === 'morning' ? '#fff3dc' : '#ffe2b8'} />
 }
 
+/**
+ * Frame the view once a scheme's scene is first ready. On a real GPU the viewer sets up its renderer
+ * and camera after the first focus has been applied, which left the camera at its default spot
+ * (seen in the Toolbelt page); framing again when the scene is ready fixes that. Later edits in the
+ * same scheme do not move the camera.
+ */
+let framedScheme: string | null = null
+function frameWhenReady(ready: boolean) {
+  const st = useStudio.getState()
+  if (!ready || st.walk || !st.schemeId || framedScheme === st.schemeId) return
+  framedScheme = st.schemeId
+  useStudio.setState({ focus: computeFocus() })
+}
+
 function lowestLevelNode() {
   const m = useStudio.getState().model
   const lv = m?.levels.slice().sort((a, b) => a.elev - b.elev)[0]
@@ -208,6 +224,14 @@ export function Stage() {
   useEffect(() => {
     if (!walking) useViewer.getState().setWallMode(look.walls)
   }, [look.walls, walking])
+  const firstLevels = useRef(true)
+  useEffect(() => {
+    if (firstLevels.current) {
+      firstLevels.current = false
+      return
+    }
+    if (!useStudio.getState().walk) useStudio.setState({ focus: computeFocus() })
+  }, [look.levels])
   useEffect(() => {
     if (useStudio.getState().walk) return
     const v = useViewer.getState()
@@ -217,7 +241,7 @@ export function Stage() {
   }, [focus?.levelId, look.levels])
   return (
     <div className="stage-canvas">
-      <Viewer selectionManager="custom" renderContext="viewer" sceneReadyKey={sceneKey} maxFps={walking ? 60 : 50} renderPaused={covered}>
+      <Viewer selectionManager="custom" renderContext="viewer" sceneReadyKey={sceneKey} maxFps={walking ? 60 : 50} renderPaused={covered} onSceneReadyChange={frameWhenReady}>
         {walking ? <WalkControls /> : <Controls />}
         <Sun />
         <Snapshotter />

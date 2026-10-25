@@ -181,10 +181,16 @@ Evidence:
 - Screenshots queued for `velda-studio/buildlog/` on the next signed-in open.
 
 Open:
-- The signed-in Toolbelt page: unverified in Toolbelt. Everything from Phase 1 on waits for one signed-in open: the migration of N8's real schemes on the test copy, the armed platform checks, the A2 import in the page, the build log screenshots copied to `velda-studio/buildlog/`, and seeing 3D on a real GPU. The 09 gate's "verify by eye in the signed-in page" is N8's to do at the gate review.
+- 2026-10-25, after the gate: checked in the Toolbelt page itself (Toolbelt's signed preview of the Velda Studio page in the built-in browser on N8's Mac, real GPU, build 4ff9f71 on `velda_studio_dev.duckdb`; the built-in browser is still not signed in to Toolbelt):
+  - Platform checks, run `pc_mvo3nayi`, all six pass: database, tool list (254 tools, sub-chat tools present), inline worker, pdf.js on its inline worker reading A2 (1.15 s, 147 text items, the 5063 x 5760 plan), the 783,147 byte plan picture through two 512 KB parts and back (write 3.1 s, read 1.2 s), sub-chat round trip ("pong", 4.3 s).
+  - The opened scheme ("Designs Unlimited 7.2.26 (A4 + A5)") migrated once: v1 "Imported from Velda 3D", v2 "Updated to the new model (every wall and opening kept)" by migration; 125 walls, 50 openings, 35 rooms. The other four schemes migrate when first opened.
+  - The build log screenshots were copied to `velda-studio/buildlog/` (14 files).
+  - A2 brought in through the page: Confirm screen in 7.8 s with 76 walls, 15 doors, 14 windows, 6 open passages, 14 named rooms plus Room 1 and Room 2, 0 conflicts and 7 unplaced items, the same as the browser test; "Looks right" saved the PDF, the plan picture (783,147 bytes) and the scheme in 39 s (blob parts over the bridge), ceiling 9'-0" marked as the person's, and opened Level 2's plan with the drawing underneath. That made an "As-built" scheme on the test copy.
+  - 3D on a real GPU: all 41 imported walls built in under 2 s, doors open the way the plan swings them, the stair flight is there. Screenshots: `docs/buildlog/phase4-page-confirm-A2.jpg`, `phase4-page-plan-A2.jpg`, `phase4-page-3d-A2.jpg`, `phase4-page-3d-du-scheme.jpg`.
+  - Found and fixed: on first open in the page the 3D camera stayed at its default spot (the viewer sets up its GPU renderer after the first framing); it now frames again once the scene is first ready.
 - In this sandbox 3D draws through SwiftShader: Pascal builds wall geometry a few walls per frame, so all 116 walls take about 70 s and Walk moves a few centimeters a second. Laptop speed unverified.
 - Both faces of a wall share one finish in Pascal, so a room's own color does not reach walls it shares with a room on another scheme.
-- The usual 3D framing is close for "spread apart" floors on the whole house.
+- Fixed after the gate: the usual 3D framing steps back for "spread apart" floors on the whole house.
 - Stairs exist only on imported sheets (the migrated v0.3 levels have none).
 
 Decisions N8 needs: the Phase 4 gate review (go for Phase 5, or what to fix first).
