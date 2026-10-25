@@ -15,7 +15,8 @@
     "test:unit": "vitest run",
     "test:import": "vitest run tests/import",
     "test:e2e": "playwright test",
-    "check": "npm run typecheck && npm run test:unit && npm run test:e2e"
+    "test:perf": "PERF=1 vitest run tests/perf",
+    "check": "npm run typecheck && npm run test:unit && npm run test:perf && npm run test:e2e"
   },
   "dependencies": {
     "@pascal-app/core": "1.0.3",

@@ -5,7 +5,8 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
-    exclude: ['tests/e2e/**', 'node_modules/**'],
+    // The timing budgets run on their own (npm run test:perf) so other test files do not share the CPU with them.
+    exclude: ['tests/e2e/**', 'node_modules/**', ...(process.env.PERF ? [] : ['tests/perf/**'])],
     environment: 'node',
     testTimeout: 30_000,
   },
