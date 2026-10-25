@@ -225,13 +225,13 @@ Evidence:
   - The checker: the WC toilet moved so its center is 12" from the wall showed "The toilet (WC) is 1'-0" from its center to the wall beside it; code needs 1'-3" each side" against code; clicking it selected and framed the toilet; "Slide it 6"" saved version 6 and the issue cleared. `phase5-page-4-toilet-flagged.jpg`, `phase5-page-5-toilet-fixed.jpg`.
 - Found in the page and fixed (1c627d6): after the swap the range wall's 11'-1" counter reached 16" into the double oven and the checker said nothing; fixtures running into each other are now flagged. "Save as a new scheme" used a browser dialog the preview does not show; it now asks for the name in place. Clicking an issue now makes its room the focus (the title said Kitchen while showing level 2).
 - Build 5528ce7 in the page: the same scheme now shows "The range wall counter runs into the double oven." (should fix, Kitchen); the name field for a new scheme opens filled with "DU kitchen, chat test (Phase 5) (copy)" and Cancel closes it without making a scheme.
+- All 11 Phase 5 screenshots copied to `velda-studio/buildlog/` by the page (build 5528ce7, 18:46 UTC).
 - Local browser-test screenshots: `docs/buildlog/phase5-chat-1-sink-to-island.jpg`, `-2-patio-doors.jpg`, `-3-range-fridge-swap.jpg`, `phase5-chat-propose.jpg` (two option cards with their plans), `phase5-checks-toilet-flagged.jpg`, `phase5-checks-toilet-cleared.jpg`.
 
 Open:
 - The DU scheme's sink wall (L1w4) is not marked as an outside wall: its migrated level 1 outline does not close, so the outside walls were not found. Velda flagged it rather than assume. It matters for the egress-door and header rules on that scheme.
 - Velda placed the patio doors left of the old window rather than centered on it, to keep counter; a person might want them centered. That is a design choice for N8.
 - Not checked yet: island seating, shower doors swinging out, shower valves on glass, the work triangle, landing areas beside appliances (nothing in the model to check them on).
-- Screenshots queued for `velda-studio/buildlog/` on the next signed-in open.
 
 Decisions N8 needs: none.
 
