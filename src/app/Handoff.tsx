@@ -122,7 +122,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
               <strong>{c.scheme.name}</strong>
               {c.isAsBuilt ? ' (the as-built)' : c.asBuilt ? `, compared with ${c.asBuilt.scheme.name}` : ', with no as-built to compare with'}
             </p>
-            <h3>Before you send it</h3>
+            <h3>Ready for your designer or architect?</h3>
             <Checklist
               lines={c.checklist}
               onFix={(l) => {
@@ -200,6 +200,7 @@ export function ShareDialog({ onClose }: { onClose: () => void }) {
   const { c, err } = useContext(true)
   const sdk = useStudio((s) => s.sdk)
   const [days, setDays] = useState(30)
+  const [withComments, setWithComments] = useState(true)
   const [list, setList] = useState<ShareRecord[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [made, setMade] = useState<ShareRecord | null>(null)
@@ -234,8 +235,9 @@ export function ShareDialog({ onClose }: { onClose: () => void }) {
         <div className="share">
           <p>
             Anyone with the link sees <strong>{c.scheme.name}</strong>
-            {c.asBuilt && !c.isAsBuilt ? <> and {c.asBuilt.scheme.name} for comparison</> : null}: the plan with its dimensions, the 3D view, comments and mood boards. They cannot change anything, and they do not need a Toolbelt account.
+            {c.asBuilt && !c.isAsBuilt ? <> and {c.asBuilt.scheme.name} for comparison</> : null}: the plan with its dimensions, the 3D view, comments and mood boards. They do not need a Toolbelt account.
           </p>
+          <p className="muted small">People with the link cannot change anything or comment on it. A designer who needs to write is added to your Toolbelt workspace and uses the studio itself.</p>
           {!sdk && <p className="veil-error">Sharing needs the Toolbelt page.</p>}
           <div className="share-make">
             <label>
@@ -245,7 +247,10 @@ export function ShareDialog({ onClose }: { onClose: () => void }) {
                 <option value={365}>1 year</option>
               </select>
             </label>
-            <button type="button" className="btn primary" disabled={!sdk || !!busy} onClick={() => void run('Making the link', async () => setMade(await share(c, days)))}>
+            <label>
+              <input type="checkbox" checked={withComments} onChange={(e) => setWithComments(e.target.checked)} /> Include comments
+            </label>
+            <button type="button" className="btn primary" disabled={!sdk || !!busy} onClick={() => void run('Making the link', async () => setMade(await share(c, days, undefined, { comments: withComments })))}>
               {busy === 'Making the link' ? 'Making the link...' : 'Make a link'}
             </button>
           </div>

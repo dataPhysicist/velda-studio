@@ -199,7 +199,7 @@ export async function zipParts(c: Context, files: Built[]): Promise<{ name: stri
 
 // ------------------------------------------------------------------ share links
 
-export type ShareRecord = { id: string; path: string; url: string; schemes: string[]; names: string[]; created: string; expires: string; bytes: number; stopped?: boolean }
+export type ShareRecord = { id: string; path: string; url: string; schemes: string[]; names: string[]; created: string; expires: string; bytes: number; comments?: boolean; stopped?: boolean }
 
 /** dist/viewer.js next to the studio bundle (jsDelivr at the release commit). */
 export function viewerUrl(): string {
@@ -228,13 +228,13 @@ const b64 = (s: string) => {
 }
 
 /** The share page for these schemes (the as-built goes with a proposed scheme so the reader sees the change). */
-export async function sharePage(c: Context): Promise<{ html: string; data: ViewerData }> {
+export async function sharePage(c: Context, opts: { comments?: boolean } = {}): Promise<{ html: string; data: ViewerData }> {
   const repo = get().repo!
   const list = [...(c.asBuilt && !c.isAsBuilt ? [c.asBuilt] : []), { scheme: c.scheme, model: c.model }]
   const schemes: ViewerScheme[] = []
   const thumbs: Record<string, string> = {}
   for (const s of list) {
-    const comments = await repo.comments(s.scheme.id).catch(() => [])
+    const comments = opts.comments === false ? [] : await repo.comments(s.scheme.id).catch(() => [])
     const replies = await repo.replies(comments.map((x) => x.id)).catch(() => [])
     schemes.push({
       id: s.scheme.id,
@@ -257,10 +257,11 @@ export async function sharePage(c: Context): Promise<{ html: string; data: Viewe
 }
 
 /** Make (or update) a share link: the page goes to Velda storage and the link is signed for `days`. */
-export async function share(c: Context, days: number, existing?: ShareRecord): Promise<ShareRecord> {
+export async function share(c: Context, days: number, existing?: ShareRecord, opts: { comments?: boolean } = {}): Promise<ShareRecord> {
   const sdk = get().sdk
   if (!sdk) throw new Error('Sharing needs Toolbelt')
-  const { html } = await sharePage(c)
+  const comments = opts.comments ?? existing?.comments ?? true
+  const { html } = await sharePage(c, { comments })
   const id = existing?.id ?? `sh${Date.now().toString(36)}`
   const path = existing?.path ?? `velda-studio/shares/${id}.html`
   await sdk.upload(path, b64(html), 'text/html')
@@ -279,6 +280,7 @@ export async function share(c: Context, days: number, existing?: ShareRecord): P
     created: existing?.created ?? new Date().toISOString(),
     expires: existing?.expires ?? new Date(Date.now() + expiresIn * 1000).toISOString(),
     bytes: new TextEncoder().encode(html).length,
+    comments,
   }
   const all = (await shares()).filter((x) => x.id !== id)
   await saveShares([rec, ...all])
