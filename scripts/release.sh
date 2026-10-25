@@ -33,7 +33,11 @@ commit "$MSG" || true
 rm -rf dist
 STUDIO_ASSET_REF="$ASSET_REF" npm run build:cdn >/dev/null
 git add -A dist
-commit "Build for the CDN (database $STUDIO_DB)"
+if git diff --cached --quiet; then
+  echo "The build is the same as the last one; pointing at it again."
+else
+  commit "Build for the CDN (database $STUDIO_DB)"
+fi
 
 # A shallow clone must be current with main before pushing, or the push re-sends the whole tree.
 git fetch -q origin main
