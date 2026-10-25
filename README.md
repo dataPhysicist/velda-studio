@@ -1,29 +1,38 @@
 # Velda Studio
 
-Remodel design by conversation. One measured 3D model of the house that you change by describing what you want and by adding photos you like. Every change is a version you can step back to. It runs as a [Toolbelt](https://apexti.com) app page on the Velda assistant.
+Your house, measured from its plans, to remodel by talking and by hand. Drop the floor plan PDFs; the studio reads the drawing's own dimension strings, asks a few questions the plan cannot answer (ceiling height, which side faces the street), and builds an editable 2D plan and 3D model where every number says where it came from. Then change it by telling Velda what you want, by dragging walls, or by adding pictures you like, and hand the result to a designer or architect as sheets, CAD, 3D and schedules, or a read-only link. It runs as a [Toolbelt](https://apexti.com) app page on the Velda assistant.
 
 Built on the MIT-licensed [Pascal editor](https://github.com/pascalorg/editor) packages (`@pascal-app/*` 1.0.3): Pascal's 3D viewer and node renderers draw the house. Pascal's editing interface is not used.
 
+## What a person does
+
+1. **Bring in the plan.** Drop the PDF set (or try the sample, the second floor of a real house). The Confirm screen shows what was read over the drawing (walls, doors, windows, rooms, the stair), what did not match, what could not be placed, and asks the few questions it needs. "Looks right" builds the house as the **as-built**, the record of the house as it is.
+2. **Change it.** Say it to Velda ("move the sink to the island"), or use the plan's five tools (Select, Wall, Opening, Measure, Comment). Each change is a version; Undo and Redo step through them. Velda never changes the as-built; it makes a new scheme. A wall that may carry load keeps the engineer note.
+3. **Check it.** The Checks tab reads every version against clearances and code (toilet, shower, aisles, door swings, bedroom escape windows, stairs, tempered glass) in plain sentences, with a Fix where one change clears it.
+4. **Make it look like something.** Paste a Pinterest pin or board or drop pictures; Velda tags them and the page measures their colors. A theme comes from the pictures, a mood board shows it, and a render paints the room (labeled "Mood, not dimensions").
+5. **Hand it off.** Export builds a zip (PDF sheet set, R12 DXF, model data, GLB, CSV schedules, change log against the as-built, inspiration, and a checklist of what is still open). Share makes a read-only link anyone can open without an account.
+
 ## How it works
 
-- **The model** (`src/model/`, v2) is the source of truth: levels, sheets, walls, doors and windows, rooms, fixtures, stairs, the drawing's dimension strings and the themes the scheme uses, all in inches in the plan frame (x right, y down the sheet). Every number carries where it came from (measured, traced, assumed, set by Velda). Every change goes through `src/model/ops.ts`, which enforces the rules (walls stay connected, openings stay in their walls, rooms are worked out from the walls, only a person can say a wall carries no load). v0.3 schemes (`src/lib/model.ts`, v1) are migrated on first open (`src/model/migrate.ts`). Every version stores a full copy.
-- **Compile** (`src/view3d/compile.ts`) turns the model into a Pascal scene in meters. Cabinet runs become Pascal modular cabinets, and a sink, range, cooktop or dishwasher inside a run's footprint becomes a module of that run. Theme roles (walls, trim, cabinets, island, counters, floors, accent, metal) become Pascal materials, per room where a room has its own theme.
-- **Velda** (`src/lib/agent.ts`): each message goes to a Velda sub-chat on Claude (Sonnet 4.6 for edits, Opus 5.5 for design questions and photos) with a compact description of the model. Velda answers with a short reply plus JSON operations (`src/lib/ops.ts`), which are applied to the model and saved as a new version. Photos are uploaded to `velda-studio/uploads/` and Velda opens them itself.
-- **Storage** (`src/repo.ts`): workspace DuckDB, tables `schemes`, `versions` (model JSON, who made it and the operations), `messages`, `comments`, `themes` (saved for reuse), `settings`, `blobs`. Development builds use `velda_studio_dev.duckdb`; only the 1.0 release uses `velda_studio.duckdb`. Queries run one at a time with retries.
-- **First run** (`src/lib/import.ts`): each Velda 3D scheme is imported with its plan walls (`apps/velda-3d/data/geo_*.json`, merged into clean wall lines by `src/lib/plan-walls.ts`, which also finds room outlines from the room labels), fixtures and themes. The Designs Unlimited color plan direction (7.6.26) is seeded as two themes, with its inspiration images in `assets/themes/`.
-- **Textures**: Pascal 1.0.3's material library points at `*_512.ktx2` files, but many bundled textures are JPG or WebP. `scripts/material-remap.json` (built by `scripts/material-remap.mjs`) points each missing file at the one that exists; `src/main.tsx` applies it at startup.
-
-- **Walkthrough** (`src/app/Walk.tsx`): first person at 5'-3" eye height; W A S D or arrows, drag to look, Shift to hurry, double-click for mouse look; collision against the model's walls with doors and openings cut out, and against fixtures.
-- **Products**: paste a link or a product photo; Velda reads the size and image, places the item, then `make_3d` turns the photo into a textured GLB (Replicate `tencent/hunyuan-3d-3.1`), stored in DuckDB `blobs`/`blob_parts` and loaded as a blob URL.
-- **Room capture** (`src/lib/capture.ts`, `src/app/actions.ts`): photos or a phone video (16 sharpest frames are pulled in the browser) go to MapAnything (Replicate `vufinder/map-anything`, Apache weights) for a metric point cloud. The page finds the floor, the wall directions and the wall-to-wall size, draws a top-down plan, lines the points up with the plan and shows them in place. Then Velda follows AWSM's observe, build, verify loop: it reads the photos and the measured plan, edits the room to match, looks at the rebuilt room from inside next to the photos, and fixes what is still off (one revision).
-- **Realistic renders**: `render` paints the design into one of N8's photos (holding his camera) or renders the current 3D view, with Replicate `google/nano-banana-2`, shown as a before/after slider.
-- Replicate jobs run through a Velda sub-chat (`src/lib/replicate.ts`), since Velda has the Replicate service and reads each model's schema itself.
+- **The model** (`src/model/`, v2) is the source of truth: levels, sheets, walls, doors and windows, rooms, fixtures, stairs, the drawing's dimension strings, inspiration and themes, all in inches in the plan frame (x right, y down the sheet). Every number carries its provenance (measured, traced, assumed, set by Velda). Every change goes through `src/model/ops.ts`, which keeps walls connected, openings in their walls, rooms worked out from the walls, and dimension strings checked against the walls. v0.3 schemes are migrated on first open (`src/model/migrate.ts`). Every version stores a full copy.
+- **Import** (`src/import/`): pdf.js reads the sheet in a worker; dimension strings are parsed and paired with their lines, the scale is read, the plan image is traced into walls, openings, labels, legend tints and stairs are found, and a least-squares solver moves walls so the drawn dimensions hold ("strings govern, pixels locate"). `src/import/intake.ts` holds the questions.
+- **Plan** (`src/plan2d/`) and **3D** (`src/view3d/compile.ts`, Pascal's viewer) show the same model; selection is shared. Walk through (`src/app/Walk.tsx`) puts you in the room at eye height.
+- **Velda** (`src/lib/agent.ts`, `src/ai/`): each message goes to a Velda sub-chat (Sonnet 4.6 for edits, Opus 5.5 for design questions, photos and links) with a compact description of the model; Velda answers in a short reply plus operations the page applies and saves as a version.
+- **Checks** (`src/analysis/`), numbers in `src/library/standards.json`.
+- **Inspiration** (`src/inspiration/`): pins and boards by URL, pictures measured for color in the page.
+- **Renders and 3D products** run on Replicate through a Velda sub-chat (`src/lib/replicate.ts`).
+- **Exports** (`src/export/`) are pure functions of the model; the share page is one self-contained HTML file built around `dist/viewer.js` (`src/viewer/`).
+- **Storage** (`src/repo.ts`): workspace DuckDB, tables `schemes`, `versions`, `messages`, `comments`, `comment_replies`, `themes`, `settings` (with `schema_version`), `blobs` and `blob_parts`. Queries run one at a time with retries.
 
 Outside Toolbelt the page opens a local preview from `scripts/fixtures/` in memory.
 
+## Databases
+
+`velda_studio.duckdb` holds the live schemes. Builds save to `velda_studio_dev.duckdb`, a test copy, and say "Test copy" in the title row, until the 1.0 release switches the default to the live database (`STUDIO_DB` at build time picks one). A page URL can override either with `?db=<name>.duckdb`. A page refuses to open a database written by a newer schema.
+
 ## Deployment
 
-Toolbelt storage holds one small file, `apps/velda-studio/index.html` (copy of `toolbelt/index.html`). It reads `release.json` from this repository's `main` branch (raw.githubusercontent.com) to learn the current build commit, then loads that commit's `dist/` through jsDelivr:
+Toolbelt storage holds one small file, `apps/velda-studio/index.html` (a copy of `toolbelt/index.html`). It reads `release.json` from this repository's `main` branch to learn the current build commit, then loads that commit's `dist/` through jsDelivr:
 
     https://cdn.jsdelivr.net/gh/dataPhysicist/velda-studio@<commit>/dist/studio.js
 
@@ -31,21 +40,15 @@ If GitHub cannot be reached within 2.5 s it loads the `FALLBACK` commit written 
 
 ## Release
 
-1. `npm install`
-2. If `assets/` changed, commit and push it first and note that commit's SHA.
-3. `rm -rf dist && STUDIO_ASSET_REF=<sha of a commit that contains the current assets/> npm run build:cdn`
-4. Commit `dist/` and push. Note the new commit SHA.
-5. Write that SHA to `release.json` (and the `FALLBACK` in `toolbelt/index.html`), commit and push. `scripts/release.sh <asset-sha> "<message>"` does steps 3 to 5.
-6. Open both jsDelivr URLs once so the CDN caches them before anyone loads the page.
-7. Occasionally copy `toolbelt/index.html` to `apps/velda-studio/index.html` in Toolbelt storage to move the fallback.
+`RELEASE_TRAILER="<attribution lines>" scripts/release.sh <commit with the current assets/> "<message>"` runs `npm run check` and refuses to release on failure, commits the source, builds for jsDelivr, pushes, and points `release.json` and `toolbelt/index.html` at the new build. Then open both jsDelivr URLs once so the CDN caches them, and copy `toolbelt/index.html` to `apps/velda-studio/index.html` in Toolbelt storage when the fallback should move.
 
 ## Local development
 
     npm install
     npm run dev
-    npm run check   # types, unit tests, browser tests (see docs/build-log.md)
+    npm run check   # types, unit tests, timing budgets, browser tests
 
-The 1.0 rebuild is tracked in `docs/build-log.md`.
+`npm run test:import` runs the A2 acceptance test alone. The browser tests need Chromium (set `PW_CHROMIUM_PATH` where Playwright's own download is blocked) and Python with `ezdxf` and `pymupdf` for the export checks. The build is tracked in `docs/build-log.md`.
 
 ## Licenses
 
