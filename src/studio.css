@@ -554,3 +554,38 @@ input.fld-num.is-bad { border-color: var(--warn); }
 .share-list .is-off { opacity: .6; }
 .share-actions { display: flex; gap: 12px; }
 @media (max-width: 760px) { .handoff { grid-template-columns: 1fr; } }
+
+/* ---------------------------------------------------------------- palette, settings, shortcuts */
+.palette-veil { place-items: start center; padding-top: 12vh; }
+.palette { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; width: min(560px, 92vw); overflow: hidden; }
+.palette input { width: 100%; box-sizing: border-box; border: 0; border-bottom: 1px solid var(--line); padding: 14px 16px; font: 16px var(--sans); background: transparent; outline: none; }
+.palette ul { list-style: none; margin: 0; padding: 6px; max-height: 50vh; overflow: auto; }
+.palette li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 10px; border-radius: 6px; cursor: pointer; }
+.palette li.is-on { background: var(--verdigris-soft); }
+.keys { border-collapse: collapse; width: 100%; font-size: 14px; }
+.keys th { text-align: left; padding: 5px 14px 5px 0; white-space: nowrap; font-weight: 400; }
+.keys kbd { font: 12px var(--mono, monospace); background: #f1efe9; border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
+.settings section { margin-bottom: 14px; }
+.settings label { margin-right: 16px; }
+.settings-themes { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.settings-themes li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
+.theme-chips { display: inline-flex; border-radius: 4px; overflow: hidden; border: 1px solid var(--line); }
+.theme-chips span { width: 12px; height: 18px; }
+.settings-theme-acts { display: flex; gap: 10px; }
+.settings-switch { display: flex; gap: 8px; align-items: center; }
+.chips.suggest { margin: 0 0 6px; }
+.chips.suggest button { font-size: 12px; padding: 2px 9px; }
+
+/* ---------------------------------------------------------------- first run and tour */
+.first-run { position: absolute; inset: 0; z-index: 40; display: grid; align-content: center; justify-items: center; gap: 14px; padding: 40px; background: var(--paper); text-align: center; }
+.first-run h1 { font: 400 48px/1 var(--serif); margin: 0; }
+.first-lead { margin: 0 0 8px; color: var(--slate); font-size: 17px; }
+.first-drop { display: grid; gap: 6px; place-items: center; width: min(520px, 90%); padding: 56px 24px; border: 2px dashed #c9c5bb; border-radius: 14px; background: #fff; font: inherit; color: var(--graphite); cursor: pointer; }
+.first-drop strong { font-size: 20px; font-weight: 600; }
+.first-drop.is-over, .first-drop:hover { border-color: var(--verdigris); background: var(--verdigris-soft); }
+.tour-ring { position: fixed; z-index: 70; border: 2px solid var(--verdigris); border-radius: 10px; box-shadow: 0 0 0 4px rgba(46, 107, 98, 0.18); pointer-events: none; transition: all 0.15s ease; }
+.tour-card { position: fixed; z-index: 71; background: var(--paper); border: 1px solid var(--verdigris); border-radius: 10px; padding: 14px 16px 12px; }
+.tour-card h2 { font: 400 22px/1.15 var(--serif); margin: 2px 0 6px; }
+.tour-card p { margin: 0 0 10px; font-size: 14px; }
+.tour-step { font-size: 12px !important; color: var(--slate); margin: 0 !important; text-transform: uppercase; letter-spacing: .04em; }
+.tour-row { display: flex; gap: 12px; align-items: center; }

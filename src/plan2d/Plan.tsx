@@ -419,7 +419,7 @@ function PlanView({ model }: { model: Model }) {
       const w = wallById.get(d.wall)!
       const wide = Math.abs(d.s1 - d.s0) >= 12
       const kind = w.exterior && !e.altKey ? 'window' : 'door'
-      const width = wide ? Math.round(Math.abs(d.s1 - d.s0) / 2) * 2 : kind === 'window' ? 36 : 32
+      const width = wide ? Math.round(Math.abs(d.s1 - d.s0) / 2) * 2 : kind === 'window' ? useEditor.getState().windowW : useEditor.getState().doorW
       const at = wide ? (d.s0 + d.s1) / 2 : d.s0
       const before = new Set(model.openings.map((o) => o.id))
       void handEdit([{ op: 'add_opening', wall: d.wall, kind, at, w: width }], `Added a ${fmt(width)} ${kind}`).then(() => {
@@ -873,7 +873,7 @@ const TOOLS: { id: Tool; name: string; key: string; hint: string; icon: React.Re
     id: 'opening',
     name: 'Opening',
     key: 'O',
-    hint: 'Click a wall for a 32" door, or a 36" window on an outside wall. Drag along the wall to set the width. Alt-click puts a door in an outside wall.',
+    hint: 'Click a wall for a door, or a window on an outside wall (their usual widths are in Settings). Drag along the wall to set the width. Alt-click puts a door in an outside wall.',
     icon: (
       <>
         <path d="M3 16h3M14 16h3M6 16V5" className="ic-line" />
@@ -1028,7 +1028,7 @@ function snapItemToWalls(m: Model, it: Item, x: number, y: number, tol: number):
 function ghostOpening(w: Wall | undefined, p: Vec): { o: Opening; w: Wall } | null {
   if (!w) return null
   const kind = w.exterior ? 'window' : 'door'
-  const width = kind === 'window' ? 36 : 32
+  const width = kind === 'window' ? useEditor.getState().windowW : useEditor.getState().doorW
   const L = wallLength(w)
   if (L < width) return null
   const at = Math.max(width / 2, Math.min(L - width / 2, Math.round(along(w, p))))

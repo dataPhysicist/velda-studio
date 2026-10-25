@@ -16,13 +16,16 @@ type EditorUi = {
   busy: boolean
   /** Thickness for walls drawn with the Wall tool (06: 4 1/2 in interior by default). */
   wallT: number
+  /** New doors and windows (Settings). */
+  doorW: number
+  windowW: number
 }
 
 /** Ops that record reality (or file ideas against it) rather than change the design: allowed on the as-built without asking (07 section 9). */
 const RECORDS = new Set(['dimension', 'note', 'field_dimension', 'add_inspiration', 'update_inspiration', 'remove_inspiration'])
 /** Schemes where the person already said yes to changing the as-built record this session. */
 const asBuiltOk = new Set<string>()
-export const useEditor = create<EditorUi>(() => ({ notice: null, confirm: null, busy: false, wallT: 4.5 }))
+export const useEditor = create<EditorUi>(() => ({ notice: null, confirm: null, busy: false, wallT: 4.5, doorW: 32, windowW: 36 }))
 
 const studio = () => useStudio.getState()
 

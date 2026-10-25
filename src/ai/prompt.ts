@@ -29,6 +29,8 @@ export type PromptInput = {
   skipped?: string[]
   /** The second step of an analyze: the checker's results to write the reply from. */
   analysis?: { scope: string; issues: Issue[]; changed: string }
+  /** Experimental room capture is on (Settings). */
+  capture?: boolean
 }
 
 const ft = (inches: number) => {
@@ -61,7 +63,7 @@ export function buildPrompt(p: PromptInput): string {
 - question: only when a wrong guess would waste real work, or when N8's words and the model disagree (two walls could be "the left wall"): {"text": "...", "options": ["short answer", "..."]} with 2 to 4 options, and ops [] or the safe part only. Otherwise choose the most reasonable reading, do it, and say what you chose.`,
     // 4. Operations
     `OPERATIONS (inches, plan coordinates; use ids exactly as listed in MODEL; give new things an "id" to refer to them later in the same list). Say what you mean and let the app do the arithmetic: prefer place, swap, move_wall, set_dimension, open_wall and replace_opening over computing x, y or wall ends yourself. Ops apply in order; one bad op is skipped and the rest still apply.
-${opsPromptText()}
+${opsPromptText(undefined, p.capture ? ['capture', 'capture_align'] : [])}
 KIND: ${KIND_LIST}. Furniture from the catalog is kind "item" with "catalog": ${CATALOG_HINT}. A sink, range, cooktop or dishwasher set into a counter, island or vanity (place with on) becomes part of it.
 Theme roles: ${ROLES.join(', ')}. Library finishes: ${lib}.
 PRODUCTS: when N8 pastes a link to furniture, a fixture or a finish, read the page and find the product name, overall width, depth and height, color or material, and the main product image URL (an https image URL, not the page URL). Then place it at its real size where it makes sense (or where N8 says), with "label" as the product name and "props":{"url":PAGE,"image":IMAGE URL,"price":...}, and follow with make_3d for that item using the image. For a pasted product photo, do the same with its storage path as the image. For a finish (tile, paint, counter), change the theme instead.`,

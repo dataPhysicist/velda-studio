@@ -3,7 +3,11 @@ import { addInspiration } from './inspiration'
 import { classifyLink } from '../inspiration/pinterest'
 import type { Source } from '../inspiration/ingest'
 import { Choices } from './Choices'
+import { plainError } from './errors'
+import { suggestions } from './suggest'
 import { ExportDialog, ShareDialog } from './Handoff'
+import { openDialog, Palette, Settings, Shortcuts, useDialogs } from './Palette'
+import { FirstRun, Tour } from './Tour'
 import { Products } from './Products'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { finishFor, ROLES, swatches, type Theme } from '../lib/theme'
@@ -23,6 +27,7 @@ export function App() {
   const status = useStudio((s) => s.status)
   const error = useStudio((s) => s.error)
   const model = useStudio((s) => s.model)
+  const firstRun = useStudio((s) => s.firstRun)
   const [drag, setDrag] = useState(false)
   const composer = useRef<ComposerApi>(null)
   // The import covers the studio; drop the 3D view meanwhile so the trace has the machine to itself.
@@ -80,13 +85,18 @@ export function App() {
         </div>
         <Versions />
         <WalkHud />
-        {(status || error || !model) && (
+        {firstRun && !model && !importing && <FirstRun />}
+        {!(firstRun && !model) && (status || error || !model) && (
           <div className="stage-veil" role="status">
             <p className={error ? 'veil-error' : ''}>{error ?? status ?? 'Loading'}</p>
           </div>
         )}
         {drag && <div className="drop-hint">Drop photos to show Velda, or a plan PDF to bring it in</div>}
         <EditorOverlay />
+        <Palette />
+        <Settings />
+        <Shortcuts />
+        <Tour prefill={(t) => composer.current?.prefill(t)} />
       </main>
       {ctxOpen ? (
         <ContextPanel onHide={() => showCtx(false)} />
@@ -194,19 +204,22 @@ function TitleBlock() {
   )
 }
 
-/** Share a read-only link, or build the package for a designer or contractor. */
+/** Share a read-only link, or build the package for a designer or contractor; Settings. */
 function HandoffButtons() {
-  const [open, setOpen] = useState<'share' | 'export' | null>(null)
+  const open = useDialogs((s) => s.open)
   return (
     <>
-      <button type="button" className="link" onClick={() => setOpen('share')}>
+      <button type="button" className="link" data-share onClick={() => openDialog('share')}>
         Share
       </button>
-      <button type="button" className="link" onClick={() => setOpen('export')}>
+      <button type="button" className="link" onClick={() => openDialog('export')}>
         Export
       </button>
-      {open === 'share' && <ShareDialog onClose={() => setOpen(null)} />}
-      {open === 'export' && <ExportDialog onClose={() => setOpen(null)} />}
+      <button type="button" className="link" onClick={() => openDialog('settings')} title="Settings (Cmd-K for every action)">
+        Settings
+      </button>
+      {open === 'share' && <ShareDialog onClose={() => openDialog(null)} />}
+      {open === 'export' && <ExportDialog onClose={() => openDialog(null)} />}
     </>
   )
 }
@@ -338,6 +351,13 @@ function useGlobalKeys() {
         if (e.key === 'Escape') cancelConfirm()
         return
       }
+      // Cmd-K or Ctrl-K opens the palette from anywhere, even while typing.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        openDialog(useDialogs.getState().open === 'palette' ? null : 'palette')
+        return
+      }
+      if (useDialogs.getState().open) return
       const el = e.target as HTMLElement | null
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return
       if (useImport.getState().stage !== 'idle' || !useStudio.getState().model) return
@@ -352,6 +372,7 @@ function useGlobalKeys() {
       if (e.key === '1') showView('plan')
       else if (e.key === '2') showView('3d')
       else if (e.key === '3') enterWalk()
+      else if (e.key === '?') openDialog('shortcuts')
       else if (e.key === '/') {
         e.preventDefault()
         ;(document.querySelector('.composer textarea') as HTMLTextAreaElement | null)?.focus()
@@ -545,14 +566,35 @@ function Versions() {
 
 // ------------------------------------------------------------------ conversation
 
-type ComposerApi = { add: (files: File[]) => void }
+type ComposerApi = { add: (files: File[]) => void; prefill: (text: string) => void }
 
-const STARTERS = [
-  'Move the sink to the island',
-  'Show this room realistically',
-  'Add a 6 foot arched opening to the deck',
-  'What would you change in this room?',
-]
+/** Things to say, from where the person is (06 section 4). */
+function useSuggestions(max = 4) {
+  const model = useStudio((s) => s.model)
+  const roomId = useStudio((s) => s.roomId)
+  const checks = useStudio((s) => s.checks)
+  const asBuilt = useStudio((s) => s.schemes.find((x) => x.id === s.schemeId)?.role === 'asbuilt')
+  const recent = useStudio((s) => {
+    const last = s.messages[s.messages.length - 1]
+    return last?.role === 'assistant' && /inspiration/i.test(last.body) && /^Added /.test(last.body) ? last.id : null
+  })
+  return useMemo(() => suggestions({ model, roomId, checks, asBuilt, recentInspiration: recent }, max), [model, roomId, checks, asBuilt, recent, max])
+}
+
+function Suggestions({ onPick }: { onPick: (t: string) => void }) {
+  const list = useSuggestions(3)
+  const messages = useStudio((s) => s.messages.length)
+  if (!messages || !list.length) return null // the welcome shows them when the chat is empty
+  return (
+    <div className="chips suggest" aria-label="Suggestions">
+      {list.map((t) => (
+        <button key={t} type="button" onClick={() => onPick(t)}>
+          {t}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 function Conversation({ composerRef }: { composerRef: React.RefObject<ComposerApi | null> }) {
   const messages = useStudio((s) => s.messages)
@@ -579,7 +621,28 @@ function Conversation({ composerRef }: { composerRef: React.RefObject<ComposerAp
   )
 }
 
+function WelcomeChips() {
+  const list = useSuggestions(4)
+  return (
+    <div className="chips">
+      {list.map((t) => (
+        <button key={t} type="button" onClick={() => send(t)}>
+          {t}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function Welcome() {
+  const model = useStudio((s) => s.model)
+  if (!model)
+    return (
+      <div className="welcome">
+        <p className="welcome-lead">Bring in your plan first, then talk to Velda about it.</p>
+        <p className="muted small">Velda reads the plan's own dimensions, so every change starts from the house as drawn.</p>
+      </div>
+    )
   return (
     <div className="welcome">
       <p className="welcome-lead">Describe a change, or show Velda what you mean.</p>
@@ -595,13 +658,7 @@ function Welcome() {
         </li>
       </ul>
       <p className="muted small">Every change is saved as a version, so you can always step back.</p>
-      <div className="chips">
-        {STARTERS.map((s) => (
-          <button key={s} type="button" onClick={() => send(s)}>
-            {s}
-          </button>
-        ))}
-      </div>
+      <WelcomeChips />
     </div>
   )
 }
@@ -829,10 +886,14 @@ const Composer = ({ ref }: { ref: React.RefObject<ComposerApi | null> }) => {
       )
       .catch((e) => {
         setAtts((a) => a.filter((x) => x.key !== key))
-        window.alert(`That video could not be read: ${(e as Error).message}`)
+        useEditor.setState({ notice: `That video could not be read (${plainError(e)}). Try a shorter clip, or a few photos instead.` })
       })
   }
-  if (ref) (ref as any).current = { add }
+  const prefill = (t: string) => {
+    setText(t)
+    requestAnimationFrame(() => input.current?.focus())
+  }
+  if (ref) (ref as any).current = { add, prefill }
 
   useEffect(() => {
     const el = input.current
@@ -923,6 +984,7 @@ const Composer = ({ ref }: { ref: React.RefObject<ComposerApi | null> }) => {
           ))}
         </div>
       )}
+      {!text && !atts.length && !thinking && !busy && <Suggestions onPick={(t) => void send(t)} />}
       <textarea
         ref={input}
         rows={1}

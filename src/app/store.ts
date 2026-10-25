@@ -15,6 +15,7 @@ import type { ToolbeltSDK } from '../toolbelt'
 import { useViewer } from '@pascal-app/viewer'
 import { type Focus, showScene } from './scene'
 import { walkStart } from './Walk'
+import { plainError } from './errors'
 
 type State = {
   sdk: ToolbeltSDK | null
@@ -54,7 +55,16 @@ type State = {
   ctxTab: 'selection' | 'checks' | 'inspiration'
   /** A request for the plan to frame some points on a level (a check clicked in the panel). */
   frameReq: { level: string; pts: [number, number][]; key: number } | null
+  /** No schemes at all: the first-run welcome shows (06 section 8). */
+  firstRun: boolean
+  /** The person's settings (Settings dialog), kept in the database. */
+  prefs: Prefs
+  /** The tour step on screen, or null. */
+  tour: number | null
 }
+
+export type Prefs = { doorW: number; windowW: number; wallT: number; capture: boolean; tourDone: boolean }
+export const DEFAULT_PREFS: Prefs = { doorW: 32, windowW: 36, wallT: 4.5, capture: false, tourDone: false }
 
 export type Look = {
   walls: 'cutaway' | 'up' | 'translucent' | 'down' // cut away, full, see-through, none
@@ -96,6 +106,9 @@ export const useStudio = create<State>(() => ({
   setAside: { dismissed: [], acked: [] },
   ctxTab: 'selection',
   frameReq: null,
+  firstRun: false,
+  prefs: DEFAULT_PREFS,
+  tour: null,
 }))
 
 const set = useStudio.setState
@@ -235,7 +248,7 @@ export async function openScheme(id: string) {
       focusOn({ roomId: same?.id ?? null, levelId: same ? same.level : get().levelId })
     }
   } catch (e) {
-    set({ status: null, error: String((e as Error).message || e) })
+    set({ status: null, error: plainError(e) })
   }
 }
 
@@ -419,6 +432,7 @@ export async function send(text: string, attachments: Attachment[] = [], opts: {
         checks: runChecks(m, { asBuilt: reference }),
         recentVersions: get().versions.slice(-5).map((v) => v.summary),
         skipped: skippedLastTurn,
+        capture: get().prefs.capture,
         ...extra,
       })
     const ans = await askVelda(sdk, promptFor(model), modelName)
@@ -525,7 +539,7 @@ export async function send(text: string, attachments: Attachment[] = [], opts: {
       await runActions(actions)
     }
   } catch (e) {
-    await addMessage({ role: 'assistant', body: `Something went wrong reaching Velda: ${(e as Error).message}. Your model is unchanged.` })
+    await addMessage({ role: 'assistant', body: `I could not answer that: ${plainError(e)}. Your model is unchanged.` })
   } finally {
     set({ thinking: null })
   }
@@ -708,4 +722,26 @@ function toBase64(blob: Blob): Promise<string> {
     r.onerror = bad
     r.readAsDataURL(blob)
   })
+}
+
+// ------------------------------------------------------------------ settings
+
+export async function loadPrefs() {
+  const raw = await get().repo?.setting('prefs').catch(() => null)
+  let prefs = DEFAULT_PREFS
+  try {
+    prefs = { ...DEFAULT_PREFS, ...JSON.parse(raw ?? '{}') }
+  } catch {}
+  set({ prefs })
+  const { useEditor } = await import('./editor')
+  useEditor.setState({ wallT: prefs.wallT, doorW: prefs.doorW, windowW: prefs.windowW })
+  return prefs
+}
+
+export async function setPrefs(patch: Partial<Prefs>) {
+  const prefs = { ...get().prefs, ...patch }
+  set({ prefs })
+  const { useEditor } = await import('./editor')
+  useEditor.setState({ wallT: prefs.wallT, doorW: prefs.doorW, windowW: prefs.windowW })
+  await get().repo?.setSetting('prefs', JSON.stringify(prefs)).catch(() => {})
 }

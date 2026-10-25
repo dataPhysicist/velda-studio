@@ -125,8 +125,9 @@ export const OP_TABLE: OpDef[] = [
   { op: 'dimension', kind: 'model', fields: [req('a', 'point'), req('b', 'point'), f('value', 'number'), f('text', 'string'), f('level', 'id'), f('id', 'id')], doc: '', hidden: true },
   { op: 'add_inspiration', kind: 'model', fields: [req('entries', 'array')], doc: '', hidden: true },
   { op: 'merge_rooms', kind: 'model', fields: [req('keep', 'id'), req('drop', 'id'), f('name', 'string')], doc: '', hidden: true },
-  { op: 'capture', kind: 'action', fields: [f('room', 'id'), f('media', 'array')], doc: '', hidden: true },
-  { op: 'capture_align', kind: 'action', fields: [f('id', 'id'), f('room', 'id'), f('quarter', 'number'), f('rotation', 'number')], doc: '', hidden: true },
+  // Room capture from photos or video: only when N8 turns on the Experimental switch in Settings.
+  { op: 'capture', kind: 'action', fields: [f('room', 'id'), f('media', 'array')], doc: 'experimental: measure the room from N8\'s photos or video frames (media: their paths) and rebuild it.', hidden: true },
+  { op: 'capture_align', kind: 'action', fields: [f('id', 'id'), f('room', 'id'), f('quarter', 'number'), f('rotation', 'number')], doc: 'experimental: turn a captured room into line with the plan.', hidden: true },
 ]
 
 export const OPS = new Map(OP_TABLE.map((d) => [d.op, d]))
@@ -199,12 +200,12 @@ export function checkShape(op: unknown): string | null {
 }
 
 /** The OPERATIONS section of Velda's prompt, one line per op, written from the table. */
-export function opsPromptText(kinds: OpDef['kind'][] = ['model', 'turn', 'action']): string {
+export function opsPromptText(kinds: OpDef['kind'][] = ['model', 'turn', 'action'], extra: string[] = []): string {
   const line = (d: OpDef) => {
     const parts = [`"op":"${d.op}"`, ...d.fields.filter((x) => !x.quiet).map(fieldText)]
     return `- {${parts.join(',')}} ${d.doc}`
   }
-  return OP_TABLE.filter((d) => !d.hidden && kinds.includes(d.kind))
+  return OP_TABLE.filter((d) => (!d.hidden || extra.includes(d.op)) && kinds.includes(d.kind))
     .map(line)
     .join('\n')
 }

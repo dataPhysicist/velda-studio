@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CheckLine } from '../export/checklist'
 import { type Built, type Context, context, PARTS, type PartKey, type ShareRecord, share, shares, size, stopShare, buildParts, zipParts } from './handoff'
+import { plainError } from './errors'
 import { focusOn, useStudio } from './store'
 
 function useContext(open: boolean) {
@@ -12,7 +13,7 @@ function useContext(open: boolean) {
     setC(null)
     context()
       .then((x) => (x ? setC(x) : setErr('Open a scheme first.')))
-      .catch((e) => setErr(String((e as Error).message || e)))
+      .catch((e) => setErr(plainError(e)))
   }, [open])
   return { c, err }
 }
@@ -105,7 +106,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       const zip = await zipParts(c, files)
       setDone({ files, zip })
     } catch (e) {
-      setFail(String((e as Error).message || e))
+      setFail(plainError(e))
     } finally {
       setBusy(null)
     }
@@ -216,7 +217,7 @@ export function ShareDialog({ onClose }: { onClose: () => void }) {
       await f()
       setList(await shares())
     } catch (e) {
-      setFail(String((e as Error).message || e))
+      setFail(plainError(e))
     } finally {
       setBusy(null)
     }

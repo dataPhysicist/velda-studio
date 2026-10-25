@@ -11,6 +11,7 @@ import type { Attachment, Capture } from '../repo'
 import { describeCamera, nearestRatio, type Quality, RENDER_RUNS, renderPrompt } from '../ai/render'
 import { snapshotView, viewPose } from './ViewerExtras'
 import { addMessage, commitVersion, rerender, useStudio } from './store'
+import { plainError } from './errors'
 
 const get = useStudio.getState
 const set = useStudio.setState
@@ -32,7 +33,7 @@ export async function runActions(actions: Op[]) {
       else if (a.op === 'make_3d') await make3d(a)
     } catch (e) {
       console.error('[studio] action failed', a, e)
-      await addMessage({ role: 'assistant', body: `${actionLabel(a)} did not finish: ${(e as Error).message}` })
+      await addMessage({ role: 'assistant', body: `${actionLabel(a)} did not finish: ${plainError(e)}. Your model is unchanged.` })
     } finally {
       set({ activity: null })
     }

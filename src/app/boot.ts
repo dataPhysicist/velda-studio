@@ -8,6 +8,7 @@ import { sceneRegistry, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
 import { connect } from '../toolbelt'
 import { focusOn, goToVersion, openScheme, rerender, send, useStudio } from './store'
+import { plainError } from './errors'
 
 declare const __STUDIO_ASSET_BASE__: string
 
@@ -46,10 +47,14 @@ export async function boot() {
   }
   try {
     await repo.init()
+    const { loadPrefs } = await import('./store')
+    await loadPrefs()
     let schemes = await repo.schemes()
     if (!schemes.length) {
       set({ status: 'Bringing in your Velda 3D schemes' })
-      const { schemes: imported, themes } = sdk ? await importFromVelda3D(sdk, __STUDIO_ASSET_BASE__) : await localFixture()
+      // ?fresh in the local preview starts from nothing, as a new person would (first-run checks).
+      const fresh = !sdk && new URLSearchParams(location.search).has('fresh')
+      const { schemes: imported, themes } = sdk ? await importFromVelda3D(sdk, __STUDIO_ASSET_BASE__) : fresh ? { schemes: [], themes: [] } : await localFixture()
       for (const t of themes) await repo.saveTheme(t)
       let sort = 0
       for (const s of imported) {
@@ -60,6 +65,11 @@ export async function boot() {
       schemes = await repo.schemes()
     }
     set({ library: await repo.themes() })
+    // Nothing to open (a new workspace with no Velda 3D schemes): the first-run welcome.
+    if (!schemes.length) {
+      set({ status: null, firstRun: true })
+      return
+    }
     const last = await repo.setting('last_scheme')
     const first = schemes.find((s) => s.id === last) ?? schemes.find((s) => s.id === 'n8-kitchen') ?? schemes[0]
     await openScheme(first.id)
@@ -74,7 +84,7 @@ export async function boot() {
         .catch((e) => console.warn('[studio] platform check failed', e))
   } catch (e) {
     console.error('[studio] boot failed', e)
-    set({ status: null, error: `Velda Studio could not start: ${(e as Error).message || e}` })
+    set({ status: null, error: `Velda Studio could not start: ${plainError(e)}. Reload the page; if it happens again, the build log has what to check.` })
   }
 }
 

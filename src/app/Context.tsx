@@ -130,7 +130,7 @@ export function ContextPanel({ onHide }: { onHide: () => void }) {
   const shown = open.length
   const worst = open.some((i) => i.severity === 'blocks') ? 'blocks' : open.some((i) => i.severity === 'fix') ? 'fix' : 'note'
   let body: React.ReactNode = null
-  if (!model) body = null
+  if (!model) body = <p className="muted ctx-empty">Sizes, checks and inspiration show here once a plan is in.</p>
   else if (selection.length > 1) body = <Many model={model} />
   else if (selection.length === 1) {
     const { kind, id } = selection[0]

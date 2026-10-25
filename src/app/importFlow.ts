@@ -9,6 +9,7 @@ import type { TraceResult } from '../import/raster/trace'
 import { deriveRooms, updateDimensionStatus } from '../model/derive'
 import type { Model, OpeningKind } from '../model/types'
 import { createScheme, focusOn, useStudio } from './store'
+import { plainError } from './errors'
 
 export type PageChoice = { role: 'asbuilt' | 'proposed' | 'reference' | 'skip'; level: string | null }
 type Fix = { kind: 'remove_wall'; id: string } | { kind: 'remove_opening'; id: string } | { kind: 'opening_kind'; id: string; to: OpeningKind }
@@ -55,7 +56,7 @@ export const useImport = create<St>(() => initial)
 const set = useImport.setState
 const get = useImport.getState
 
-const fail = (e: unknown) => set({ stage: 'error', error: String((e as Error)?.message || e) })
+const fail = (e: unknown) => set({ stage: 'error', error: plainError(e) })
 
 export function cancelImport() {
   const { rasterUrl } = get()
