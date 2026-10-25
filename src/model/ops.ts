@@ -13,6 +13,7 @@ import {
   type Dimension,
   ITEM_KINDS,
   type Item,
+  type Inspiration,
   type ItemKind,
   type Model,
   type Note,
@@ -29,6 +30,7 @@ export type OpContext = { author: Author; versionLabel?: string; focusLevel?: st
 export type OpResult = { model: Model; applied: number; skipped: string[]; notes: string[] }
 
 const STYLES: OpeningStyle[] = ['swing', 'pocket', 'sliding', 'french', 'bifold', 'barn', 'fixed', 'casement', 'double_hung', 'slider', 'cased']
+const arr = (v: any): string[] => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim()).slice(0, 24) : [])
 const num = (v: any) => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(+v) ? +v : undefined)
 const vec = (v: any): Vec | undefined => (Array.isArray(v) && v.length >= 2 && num(v[0]) !== undefined && num(v[1]) !== undefined ? [num(v[0])!, num(v[1])!] : undefined)
 
@@ -804,6 +806,49 @@ function applyOne(m: Model, op: Op, ctx: OpContext): Applied | string {
       } else note = `Kept the ${dim.text} measurement; it does not line up with two wall faces, so nothing moved.`
       out.dimensions.push(dim)
       return { model: out, geometry: true, note }
+    }
+    case 'add_inspiration': {
+      // Entries the page made from a drop or a link (src/inspiration/ingest.ts).
+      const list: Inspiration[] = (Array.isArray(op.entries) ? op.entries : []).filter((e: any) => e && typeof e.id === 'string' && (e.image || e.url))
+      if (!list.length) return 'nothing to add'
+      const have = new Set(m.inspiration.map((e) => e.id))
+      const tags = (t: any) => ({ style: arr(t?.style), palette: (Array.isArray(t?.palette) ? t.palette : []).filter((p: any) => /^#[0-9a-f]{6}$/i.test(p?.hex ?? '')), materials: arr(t?.materials), fixtures: arr(t?.fixtures), ...(t?.notes ? { notes: String(t.notes) } : {}) })
+      for (const e of list) {
+        if (have.has(e.id)) continue
+        m.inspiration.push({ ...e, tags: tags(e.tags), rooms: arr(e.rooms).filter((r) => m.rooms.some((x) => x.id === r)), addedBy: e.addedBy === 'ai' ? 'ai' : 'user', createdAt: e.createdAt ?? ctx.now ?? new Date().toISOString() })
+      }
+      return { model: m, geometry: false }
+    }
+    case 'update_inspiration': {
+      const e = m.inspiration.find((x) => x.id === op.id)
+      if (!e) return `no inspiration ${op.id}`
+      if (typeof op.title === 'string') e.title = op.title
+      if (Array.isArray(op.rooms)) {
+        const ids = op.rooms.map((r: any) => findRoom(m, r)?.id).filter(Boolean) as string[]
+        e.rooms = [...new Set(ids)]
+      }
+      if (op.add_room) {
+        const r = findRoom(m, op.add_room)
+        if (!r) return `no room ${op.add_room}`
+        e.rooms = [...new Set([...e.rooms, r.id])]
+      }
+      if (op.tags && typeof op.tags === 'object')
+        e.tags = {
+          ...e.tags,
+          ...(op.tags.style ? { style: arr(op.tags.style) } : {}),
+          ...(op.tags.materials ? { materials: arr(op.tags.materials) } : {}),
+          ...(op.tags.fixtures ? { fixtures: arr(op.tags.fixtures) } : {}),
+          ...(Array.isArray(op.tags.palette) ? { palette: op.tags.palette.filter((p: any) => /^#[0-9a-f]{6}$/i.test(p?.hex ?? '')) } : {}),
+          ...(op.tags.notes ? { notes: String(op.tags.notes) } : {}),
+        }
+      return { model: m, geometry: false }
+    }
+    case 'remove_inspiration': {
+      const before = m.inspiration.length
+      // Removing a board removes the pins that came with it.
+      m.inspiration = m.inspiration.filter((x) => x.id !== op.id && x.parent !== op.id)
+      if (m.inspiration.length === before) return `no inspiration ${op.id}`
+      return { model: m, geometry: false }
     }
     case 'note': {
       if (!op.text) return 'needs text'

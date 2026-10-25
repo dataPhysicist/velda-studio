@@ -200,10 +200,13 @@ export type Dimension = {
 export type Inspiration = {
   id: string
   kind: 'image' | 'pin' | 'board' | 'product' | 'url' | 'color'
-  url?: string
-  image?: string
+  url?: string // the page it came from (pin, board, product)
+  image?: string // Velda storage path, or the picture's own URL for pins and products
+  thumb?: string // a small version for cards, when the source has one
   title?: string
-  source?: string
+  source?: string // the site it came from ("pinterest.com", "decorpad.com", "your photo")
+  parent?: string // the board a pin came in with
+  sampled?: { hex: string; share: number }[] // colors measured from the picture (07 section 6)
   tags: { style: string[]; palette: { hex: string; name?: string }[]; materials: string[]; fixtures: string[]; notes?: string }
   rooms: string[]
   addedBy: 'user' | 'ai'

@@ -1,0 +1,1 @@
+Saved responses of Pinterest's public embed-widget endpoints (widgets.pinterest.com/v3/pidgets), the same JSON the page reads, captured 2026-10-25 from the Toolbelt page: one public pin (/pin/93309023521348330/) and one public board of 10 pins. People's names, profiles and usernames are replaced with placeholders.

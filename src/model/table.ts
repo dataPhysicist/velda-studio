@@ -101,6 +101,9 @@ export const OP_TABLE: OpDef[] = [
   { op: 'set_level', kind: 'model', fields: [f('id', 'id', 'LEVEL'), f('ceiling', 'number', 'IN'), f('floorThickness', 'number', 'IN')], oneOf: ['ceiling', 'floorThickness'], doc: 'a level\'s ceiling height or floor structure.' },
   { op: 'field_dimension', kind: 'model', fields: [req('a', 'point', '[x,y]'), req('b', 'point', '[x,y]'), req('value', 'number', 'IN'), f('text', 'string'), f('level', 'id')], doc: 'records a tape measurement between two wall faces; the model moves to match it (field measurements govern). Allowed on the as-built.' },
   { op: 'note', kind: 'model', fields: [req('text', 'string')], doc: 'a note on the plan. Allowed on the as-built.' },
+  { op: 'update_inspiration', kind: 'model', fields: [req('id', 'id', 'INSPIRATION'), f('title', 'string'), f('rooms', 'array', '[ROOM]'), f('add_room', 'id', 'ROOM'), f('tags', 'object', '{"style"?,"materials"?,"fixtures"?,"palette"?:[{"hex","name"}]}')], doc: 'retitles an inspiration card, retags it, or says which rooms it is for.' },
+  { op: 'remove_inspiration', kind: 'model', fields: [req('id', 'id', 'INSPIRATION')], doc: 'removes an inspiration card (a board takes its pins with it).' },
+  { op: 'inspiration_add', kind: 'turn', fields: [f('url', 'string'), f('path', 'string'), f('rooms', 'array', '[ROOM]')], oneOf: ['url', 'path'], doc: 'adds a picture, a Pinterest pin or board, or a page as inspiration for those rooms; the app reads it, samples its colors and asks you to tag it.' },
   {
     op: 'theme',
     kind: 'model',
@@ -111,7 +114,7 @@ export const OP_TABLE: OpDef[] = [
   // Page-level: run around the call
   { op: 'analyze', kind: 'turn', fields: [f('scope', 'id', 'ROOM|"house"')], doc: 'runs the clearance and code checks after your other ops; you get the results and write the reply from them in a second step.' },
   { op: 'propose', kind: 'turn', fields: [f('room', 'id', 'ROOM'), req('options', 'array', '[{"label":"...","ops":[...]}]')], doc: '2 or 3 design options; each becomes its own scheme branched from this one and N8 picks. Use for "what would you do here" and "show me options".' },
-  { op: 'research', kind: 'turn', fields: [req('query', 'string'), en('kind', ['product', 'idea', 'code'])], doc: 'records what you searched the web for (search with web_search_exa before answering).' },
+  { op: 'research', kind: 'turn', fields: [req('query', 'string'), en('kind', ['product', 'idea', 'code']), f('results', 'array', '[{"title","url","type","w":IN,"d":IN,"price"?,"image"?}]')], doc: 'records what you searched the web for (search with web_search_exa before answering); for products, list what you found with real sizes so N8 can place one.' },
   // Longer jobs after the reply
   { op: 'render', kind: 'action', fields: [f('from', 'string', '"view"|photo path'), f('room', 'id', 'ROOM'), f('prompt', 'string'), f('refs', 'array', '[image paths or URLs]'), en('quality', ['standard', 'best'])], doc: 'a photorealistic image of the current 3D view ("view") or N8\'s own photo of the room remodeled.' },
   { op: 'make_3d', kind: 'action', fields: [req('id', 'id', 'ITEM'), f('image', 'string', 'image URL or path')], doc: 'builds a real 3D model of a product from its photo, in the item\'s place.' },
@@ -120,6 +123,7 @@ export const OP_TABLE: OpDef[] = [
   { op: 'ceiling', kind: 'model', fields: [req('h', 'number')], doc: '', hidden: true },
   { op: 'move_joint', kind: 'model', fields: [req('at', 'point'), req('to', 'point')], doc: '', hidden: true },
   { op: 'dimension', kind: 'model', fields: [req('a', 'point'), req('b', 'point'), f('value', 'number'), f('text', 'string'), f('level', 'id'), f('id', 'id')], doc: '', hidden: true },
+  { op: 'add_inspiration', kind: 'model', fields: [req('entries', 'array')], doc: '', hidden: true },
   { op: 'merge_rooms', kind: 'model', fields: [req('keep', 'id'), req('drop', 'id'), f('name', 'string')], doc: '', hidden: true },
   { op: 'capture', kind: 'action', fields: [f('room', 'id'), f('media', 'array')], doc: '', hidden: true },
   { op: 'capture_align', kind: 'action', fields: [f('id', 'id'), f('room', 'id'), f('quarter', 'number'), f('rotation', 'number')], doc: '', hidden: true },

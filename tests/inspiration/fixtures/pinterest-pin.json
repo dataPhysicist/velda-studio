@@ -1,0 +1,56 @@
+{
+ "status": "success",
+ "code": 0,
+ "message": "ok",
+ "endpoint_name": "v3_pin_info",
+ "data": [
+  {
+   "board": {
+    "description": "",
+    "image_thumbnail_url": "https://i.pinimg.com/upload/93309092218957447_board_thumbnail_2022-07-28-06-20-23_93168_60.jpg",
+    "name": "Mixed Marble",
+    "follower_count": 404,
+    "id": "93309092218957447",
+    "url": "/a-pinterest-user/mixed-marble/",
+    "pin_count": 173
+   },
+   "domain": "decorpad.com",
+   "videos": null,
+   "story_pin_data": null,
+   "pinner": {
+    "full_name": "A Pinterest user",
+    "profile_url": "https://www.pinterest.com/",
+    "image_small_url": "",
+    "about": "",
+    "id": "0"
+   },
+   "native_creator": null,
+   "description": " ",
+   "rich_metadata": null,
+   "dominant_color": "#dadad9",
+   "is_video": false,
+   "id": "93309023521348330",
+   "attribution": null,
+   "link": "https://www.decorpad.com/amp/photo.htm?photoId=164461",
+   "embed": null,
+   "repin_count": 38,
+   "images": {
+    "236x": {
+     "width": 236,
+     "height": 354,
+     "url": "https://i.pinimg.com/236x/17/7c/fc/177cfc11d0dc563fcf6f576f2531de20.jpg"
+    },
+    "237x": {
+     "width": 236,
+     "height": 354,
+     "url": "https://i.pinimg.com/236x/17/7c/fc/177cfc11d0dc563fcf6f576f2531de20.jpg"
+    },
+    "564x": {
+     "width": 493,
+     "height": 740,
+     "url": "https://i.pinimg.com/564x/17/7c/fc/177cfc11d0dc563fcf6f576f2531de20.jpg"
+    }
+   }
+  }
+ ]
+}

@@ -23,41 +23,46 @@ export function pickModel(text: string, attachments: Attachment[]) {
   return attachments.length || /https?:\/\//.test(text) || DEEP.test(text) || text.length > 280 ? DEEP_MODEL : FAST_MODEL
 }
 
-/** Pull the first JSON object out of a model reply. */
-export function parseAnswer(raw: string): AgentAnswer {
+/** The first JSON object in a model reply (code fences and unescaped inch marks repaired), or null. */
+export function firstJson(raw: string): any {
   const s = repairQuotes(raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, ''))
-  let obj: any = null
   const start = s.indexOf('{')
-  if (start >= 0) {
-    let depth = 0
-    let inStr = false
-    let esc = false
-    for (let i = start; i < s.length; i++) {
-      const ch = s[i]
-      if (inStr) {
-        if (esc) esc = false
-        else if (ch === '\\') esc = true
-        else if (ch === '"') inStr = false
-        continue
-      }
-      if (ch === '"') inStr = true
-      else if (ch === '{') depth++
-      else if (ch === '}') {
-        depth--
-        if (depth === 0) {
-          const text = s.slice(start, i + 1)
+  if (start < 0) return null
+  let depth = 0
+  let inStr = false
+  let esc = false
+  for (let i = start; i < s.length; i++) {
+    const ch = s[i]
+    if (inStr) {
+      if (esc) esc = false
+      else if (ch === '\\') esc = true
+      else if (ch === '"') inStr = false
+      continue
+    }
+    if (ch === '"') inStr = true
+    else if (ch === '{') depth++
+    else if (ch === '}') {
+      depth--
+      if (depth === 0) {
+        const text = s.slice(start, i + 1)
+        try {
+          return JSON.parse(text)
+        } catch {
           try {
-            obj = JSON.parse(text)
+            return JSON.parse(repairQuotes(text))
           } catch {
-            try {
-              obj = JSON.parse(repairQuotes(text))
-            } catch {}
+            return null
           }
-          break
         }
       }
     }
   }
+  return null
+}
+
+/** Pull the first JSON object out of a model reply. */
+export function parseAnswer(raw: string): AgentAnswer {
+  const obj = firstJson(raw)
   if (!obj) return { reply: raw.trim() || 'I could not work that out. Try saying it another way.', summary: '', ops: [], question: null }
   const q = obj.question && typeof obj.question === 'object' && obj.question.text ? obj.question : null
   return {
