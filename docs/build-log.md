@@ -9,10 +9,11 @@ The working record for the 1.0 rebuild. The spec is in the Project under `claude
 | Step | Command | What it covers |
 |---|---|---|
 | Type-check | `tsc --noEmit && tsc --noEmit -p tsconfig.node.json` | the app (`src`, `shims`) and the tests and configs (`tests`, `*.config.ts`, `scripts/**/*.ts`) |
-| Unit tests | `vitest run` | everything in `tests/**/*.test.ts` except `tests/e2e` (node, no browser) |
+| Unit tests | `vitest run` | everything in `tests/**/*.test.ts` except `tests/e2e` and `tests/perf` (node, no browser) |
+| Timing budgets | `PERF=1 vitest run tests/perf` | 03 section 7, alone so nothing else shares the CPU |
 | Browser tests | `playwright test` | `tests/e2e`, Chromium with WebGL through SwiftShader, against `vite` on port 5199 started by Playwright |
 
-Also: `npm run test:import` is `vitest run tests/import` (the A2 import gate) and `npm run test:e2e` is `playwright test`. CI (`.github/workflows/check.yml`) runs `npm ci`, `npx playwright install --with-deps chromium`, `npm run check` on every push to main.
+Also: `npm run test:import` is `vitest run tests/import` (the A2 import gate), `npm run test:perf` the timing budgets, `npm run test:e2e` is `playwright test`, and `npm run schema` writes `schema/model-v2.schema.json` from `src/model/types.ts`. The export tests read their files back with Python (`ezdxf`, `pymupdf`, `jsonschema`). CI (`.github/workflows/check.yml`) runs `npm ci`, installs those three, `npx playwright install --with-deps chromium`, `npm run check` on every push to main.
 
 Where Playwright's Chromium download is blocked (this build sandbox), set `PW_CHROMIUM_PATH` to another Chromium. Here: `npm i @sparticuz/chromium@153` in a scratch folder, `executablePath()` unpacks it to `/tmp/chromium`, then `PW_CHROMIUM_PATH=/tmp/chromium npm run check`.
 
@@ -96,6 +97,14 @@ Where Playwright's Chromium download is blocked (this build sandbox), set `PW_CH
 - 2026-10-25 Web pictures (Pinterest) cannot be read by the page, so the PDF, the share page and the package show them as their measured colors with the link; stored pictures (dropped files, chat photos) are embedded. A way to keep a small copy of web pictures (the sandbox can fetch them, but a sub-chat's output files are not saved to storage) is open.
 - 2026-10-25 Share links: the page is one HTML file in Velda storage (`velda-studio/shares/<id>.html`) with the schemes inside, `dist/viewer.js` and three.js from jsDelivr; the link is `manage_shared_artifacts` `create_link` (a signed storage link; 30 days or 1 year was accepted), falling back to a signed URL. It returns no share id, so "turn off" removes the file (or replaces it with a notice), and "update" re-uploads the same file so the link shows the new version. The as-built always goes with a proposed scheme.
 - 2026-10-25 Which as-built a scheme compares with: of the as-built schemes, the one sharing the most wall ids with it (a scheme copied from the A2 import shares its walls).
+- 2026-10-25 The plan keeps its rooms, walls, openings, stairs and room-name spots between renders and redraws only what is sized for the screen (text, handles, pins) when you pan or zoom.
+- 2026-10-25 The tour's card never covers what it points at: beside the plan in the column to its left, above the chat box, and to the side of small targets. It waits behind Share, Export, Settings and the as-built question. Step 2 offers a change for the room just clicked (the tub to a shower, a second sink at a vanity, the kitchen sink to the island, else the room 1'-0" bigger), since a sample or a level with no kitchen made "Move the sink to the island" nonsense. Setting a room's size by typing also finishes the drag-a-wall step.
+- 2026-10-25 A drawn dimension in conflict shows both numbers on the plan and the sheets ("5'-2" drawn, 4'-9" now"), as 06 asks. The model rule stays as 04 says (any change recomputes, more than 1/2 in off is a conflict); on a proposed scheme, the handoff checklist leaves out drawn dimensions that hold on the as-built, because the design moved them on purpose and the change log has them.
+- 2026-10-25 The Confirm screen counts conflicts the way the finished model has them. The solver's own residuals had A2 at 0, but re-trimming corners after the solve leaves one string just over the line (4'-0" drawn at the I.T. closet, 4'-0 1/2" between its walls), so the plan showed a red dimension the Confirm screen had not mentioned.
+- 2026-10-25 Plain words, checked by a test that reads every screen (text, tooltips, labels a screen reader speaks): no field names, ids, raw values or timestamps, metric units or em dashes, and none of node, scheme version, Replicate, prediction, JSON, SQL, API or schema. Version times read "Oct 25, 3:16 PM"; the handoff checklist names a door by its rooms ("the 4'-0" door between the Guest Bathroom 3 and the Jack & Jill Shower"), not by its id.
+- 2026-10-25 The timing budgets run in `npm run test:perf`, on their own inside `npm run check`, because with every test file running at once the GitHub runner timed clear dimensions at 27 ms; alone they take 12.5 ms.
+- 2026-10-25 A room's sizes find the inside of each edge from the way its outline winds, not from one point inside it (12.5 ms to 2.8 ms for the whole house, and right on the inner edges of an L-shaped room).
+- 2026-10-25 A render names the room it is for in the camera words when that room is in the picture.
 
 ## 2026-10-18  Phase 0  commit eaa8f33 (dev release, build 5f119ff)
 
@@ -342,3 +351,91 @@ Open:
 Decisions N8 needs: none. Needs from N8: open the Claude desktop app so the built-in browser link comes back; then open the share link I send in a private window.
 
 Next: the page checks for Phases 7 and 8 when the browser is back; Phase 9 (first run, tour, empty states, command palette, settings, performance, the 1.0 release, which needs N8's go for the live data migration).
+
+## 2026-10-25  Phase 9  commits 36baf3c to 1f5bfef (dev release, build 1b54a6c)
+
+Done:
+- First run (`src/app/Tour.tsx`): a welcome with one drop zone and "Try the sample plan" (the A2 sheet), then a five-step tour that points at the real thing (click a room; tell Velda, with a change for that room in the chat box; drag a wall; add inspiration; Share). Each step finishes when you do it, every step can be skipped, the tour can be ended and started again from Settings.
+- Command palette (Cmd or Ctrl-K: every action, room and level by name, anything else goes to Velda), keyboard shortcuts list (?), Settings (new door, window and wall sizes, saved themes, the experimental photo capture switch, the tour, the build). Empty states, suggested prompts in the chat box, and error messages in plain words (`src/app/errors.ts`).
+- Performance pass: the plan keeps its fixed layers when you pan or zoom.
+- Stranger walk (new scheme from the sample A2, the tour, share), with a picture at every step. Fixed what confused:
+  - The tour card sat on the plan and covered the walls step 3 asks you to drag, and covered Undo while saying every change can be undone. It now sits beside what it points at.
+  - The tour card stayed on top of Share, Export and the as-built question. It now waits behind them.
+  - Step 2 offered "Move the sink to the island" on a level with no kitchen. It now offers a change for the room you clicked.
+  - Dragging a wall on a design made the drawn dimensions it moved turn red with no explanation. They now say "5'-2" drawn, 4'-9" now".
+  - The Export checklist showed a door as "A2w30d1" and called a design change a conflict.
+  - Version times showed as raw timestamps.
+  - The Confirm screen said every dimension agreed while the plan showed one in red.
+  - The pointer's position pushed the drawing slider's label under the tools.
+- Found by checking the success criteria:
+  - The share page showed fixtures without their sizes. It now has a Sizes tab: rooms, doors, windows and fixtures of the level with their sizes. Fixtures on the plan also say their size on hover.
+  - `schema/model-v2.schema.json` was missing. It is now generated from the model's types (`npm run schema`) and goes in the package next to model.json.
+- A render describes the camera from the room it is for when that room is in the picture. The browser test caught the camera still gliding, so the middle of the view landed on the closet next door.
+- README rewritten for 1.0.
+- CI was failing since Phase 8 (ezdxf missing on the runner). It now installs ezdxf, PyMuPDF and jsonschema, and the timing budgets run on their own.
+
+Evidence:
+- `npm run check` green inside `scripts/release.sh`: 151 unit tests in 20 files, 2 timing tests, 17 browser tests (14.3 min). CI run 40245220397 on 1f5bfef: success in 15m 29s, the first green run since Phase 7.
+- Timing (03 section 7), in this sandbox (two slow cores, software rendering, the dev build of React), so upper bounds for a laptop:
+
+  | What | Measured | Budget |
+  |---|---|---|
+  | A2 trace (29.2 MP) | 465 ms | under 5 s |
+  | Whole migrated house (116 walls, 29 rooms): clear dimensions | 2.8 ms (12.5 ms before 1f5bfef) | under 16 ms |
+  | Whole migrated house: 3D compile | 7.4 ms | under 100 ms |
+  | Whole migrated house: checks | 5.5 ms | none |
+  | Whole migrated house: plan drawing | 14.6 ms | none |
+  | A2: clear dimensions | 3.1 ms | under 16 ms |
+  | A2: 3D compile | 2.9 ms | under 100 ms |
+  | A2: an edit plus its 3D compile | 19.4 ms | under 100 ms |
+  | Plan with 200 walls on a level, zoom | 16.7 ms a frame (60 fps), 6.1 ms of script a step | 60 fps |
+  | Plan with 200 walls on a level, pan | 16.7 ms a frame (60 fps), 6.4 ms of script a step | 60 fps |
+
+  Plan zoom before the change: 13 to 15 ms of script a step, 25 fps. Tests: `tests/perf/budgets.test.ts`, `tests/e2e/perf.spec.ts`.
+- `tests/e2e/firstrun.spec.ts`:
+  - The welcome, the sample plan through the Confirm screen, and every tour step.
+  - A real wall drag on the as-built: the question comes up over the tour, then "Make a new scheme", and the as-built stays as it was.
+  - The palette ("go laundry" goes to the Laundry Room; anything else offers "Ask Velda"), Settings (a 36" door width is kept), and the shortcuts list.
+  - The Confirm screen, the tour and Export after the import, read for machine words.
+  - Screenshots `docs/buildlog/phase9-first-run.jpg`, `phase9-tour-velda.jpg`, `phase9-palette.jpg`.
+- `tests/e2e/plainwords.spec.ts`: no machine words anywhere a person goes without Velda. Covered: the welcome, plan, 3D, each panel tab, a selected room, wall, door and fixture, the version strip, Share, Export, the palette, Settings and the shortcuts. Screenshot `phase9-plain-words.jpg`.
+- `tests/e2e/viewer.spec.ts`:
+  - The share page's Sizes tab has the four tables, a fixture's width in feet and inches, and no machine words. Screenshot `phase9-viewer-sizes.jpg`.
+  - `tests/export/schema.test.ts`: the A2 import, an edited scheme and the migrated house all fit the schema (jsonschema 4.26, Draft 7).
+- Stranger walk pictures, before and after the fixes, are in the build sandbox, not committed. They were taken with a scratch test that is not part of the suite.
+
+1.0 success criteria (02):
+1. DU sheets A1, A2, A4, A5 in one go, a correct two-level house in under ten minutes, no tool palette: not verified. Only A2 is attached.
+   - A2 alone: Confirm screen in 7.8 s in the Toolbelt page (Phase 4). In the local preview, welcome to the built house in under a minute (`firstrun.spec.ts`, 50 s with the tour).
+   - Two levels are aligned in code (`src/import/align.ts`) and tested against the migrated v0.3 level 1.
+   - Needs: the DU PDF set.
+2. The A2 acceptance test passes in CI: `tests/import/a2.test.ts` and `tests/e2e/import.spec.ts`, CI run 40245220397 (success).
+3. The three kitchen changes by chat only, shown right in plan and 3D with dimensions: met on the test copy in Phase 5.
+   - With the real Velda in the Toolbelt page: 6 s, 13 s and 19 s, one version each, positions checked to the inch.
+   - Screenshots `phase5-page-1-sink-to-island.jpg`, `-2-patio-doors.jpg`, `-3-range-fridge-swap.jpg`.
+4. A designer opens the share link cold and reads every room dimension, fixture size and material:
+   - Locally: plan with clear dimensions, the Sizes tab, mood boards with materials (`viewer.spec.ts`).
+   - Opening a real link in a private window: unverified in Toolbelt.
+5. The DXF opens in a free viewer, right layers and scale:
+   - ezdxf audit 0 errors.
+   - Drawn by ezdxf's own viewer (`docs/buildlog/phase9-dxf-ezdxf-view.png`): walls, doors, windows, room names and dimensions on their AIA layers.
+   - Drawn full size: each of the 83 dimension texts reads its own line length within 1/2 in (`tests/export/dxf.test.ts`).
+   - AutoCAD: unverified.
+6. Nothing needs knowing "node", "scheme version" or "Replicate": `plainwords.spec.ts` and the reads in `firstrun.spec.ts` and `viewer.spec.ts`. Velda's own replies are not covered by the test; her prompt asks for plain words.
+
+Open:
+- In-page checks for Phases 7, 8 and 9 in the signed-in page with this build: unverified in Toolbelt. N8's computer has been offline since Phase 7.
+  - A render of the primary bath and its cost.
+  - Export and the zip.
+  - Share with real storage, opened in a private window.
+  - The tour on the real page.
+- The 1.0 release itself waits for N8's go:
+  - default database `velda_studio.duckdb`
+  - version 1.0.0
+  - the one-time upgrade of the live schemes, after a backup of the live tables
+  - the fallback in `apps/velda-studio/index.html` moved to the 1.0 build
+- In this sandbox the 3D view of a small room still shows the floor close up 20 s after switching. Pascal builds walls a few per frame under software rendering. Laptop speed unverified, as noted in Phase 4.
+
+Decisions N8 needs: the go for 1.0 (the live database).
+
+Next: on N8's go, back up the live tables, release 1.0.0 on `velda_studio.duckdb`, open the page once so the live schemes upgrade, check the As-built head still has 108 walls and 51 openings, and move the fallback. Then the in-page checks when the browser link is back.
