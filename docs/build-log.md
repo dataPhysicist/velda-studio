@@ -273,6 +273,7 @@ Evidence:
   - A placed product's name was cut mid-word ("... shower base, o") and lowercased in a check ("royal Bath").
   - "Make a new scheme" from a hand edit named it "Option 1" (now named from the change).
   - The mood board showed only the first color for each role.
+- All 5 Phase 6 screenshots copied to `velda-studio/buildlog/` by the page (build 596819d, 20:11 UTC).
 
 Open:
 - Times in the page: three pictures about a minute; a 9-picture board 2 1/2 minutes before the parallel change (not yet re-timed); a theme about half a minute; a shower search with products 2 1/2 minutes.
