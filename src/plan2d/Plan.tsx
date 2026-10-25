@@ -642,6 +642,56 @@ function PlanView({ model }: { model: Model }) {
   }
 
   // ---------------------------------------------------------------- render
+  // The rooms, walls, openings and stairs do not change with the zoom, so a pan or zoom reuses them
+  // and only the text sized for the screen is drawn again (03 section 7: 60 fps with 200 walls).
+  const selKey = selection.map((x) => `${x.kind}:${x.id}`).join(',')
+  // biome-ignore lint: the layer follows the model, the level and the selected room
+  const roomLayer = useMemo(
+    () => (
+      <g className="rooms">
+        {rooms.map((r) =>
+          r.polygon.length >= 3 ? (
+            <polygon key={r.id} points={pts(r.polygon)} data-k="room" data-id={r.id} className={`room${r.id === selRoomId ? ' is-sel' : ''}${r.flags.includes('needs_confirming') ? ' is-confirm' : ''}`} />
+          ) : null,
+        )}
+      </g>
+    ),
+    [m, level, selRoomId],
+  )
+  // biome-ignore lint: the layer follows the model, the level and the selection
+  const buildLayer = useMemo(
+    () => (
+      <>
+        <g className="walls">
+          {walls.map((w) => (
+            <polygon
+              key={w.id}
+              points={pts(wallPoly(w))}
+              data-k="wall"
+              data-id={w.id}
+              className={`wall${w.exterior ? ' is-ext' : ''}${w.demolish ? ' is-demolish' : ''}${isSel('wall', w.id) ? ' is-sel' : ''}${w.kind !== 'wall' ? ` kind-${w.kind}` : ''}`}
+            />
+          ))}
+        </g>
+        <g className="openings">
+          {openings.map((o) => (
+            <OpeningShapeView key={o.id} o={o} w={wallById.get(o.wall)!} sel={isSel('opening', o.id)} />
+          ))}
+        </g>
+        <g className="stairs">
+          {m.stairs
+            .filter((s) => s.level === level || s.toLevel === level)
+            .map((s) => (
+              <polygon key={s.id} points={pts(s.polygon)} data-k="stair" data-id={s.id} className={`stair${isSel('stair', s.id) ? ' is-sel' : ''}`} />
+            ))}
+        </g>
+      </>
+    ),
+    [m, level, selKey],
+  )
+  // Where each room's name sits (the point farthest from its walls) does not change with the zoom either.
+  // biome-ignore lint: follows the model and the level
+  const labels = useMemo(() => new Map(rooms.filter((r) => r.polygon.length >= 3).map((r) => [r.id, roomLabel(r)])), [m, level])
   const k = perPx()
   const ghost = tool === 'opening' && cursor && !drag ? ghostOpening(wallUnder(cursor.p), cursor.p) : null
   const overall = levelOverall(m, level)
@@ -707,41 +757,13 @@ function PlanView({ model }: { model: Model }) {
         {underlay && shownOpacity > 0 && (
           <image href={underlay.url} x={0} y={0} width={underlay.w} height={underlay.h} opacity={shownOpacity} preserveAspectRatio="none" transform={underlay.transform} className="underlay" />
         )}
-        <g className="rooms">
-          {rooms.map((r) =>
-            r.polygon.length >= 3 ? (
-              <polygon key={r.id} points={pts(r.polygon)} data-k="room" data-id={r.id} className={`room${r.id === selRoomId ? ' is-sel' : ''}${r.flags.includes('needs_confirming') ? ' is-confirm' : ''}`} />
-            ) : null,
-          )}
-        </g>
+        {roomLayer}
         <g className="items">
           {items.map((it) => (
             <ItemShape key={it.id} it={it} sel={isSel('item', it.id)} k={k} />
           ))}
         </g>
-        <g className="walls">
-          {walls.map((w) => (
-            <polygon
-              key={w.id}
-              points={pts(wallPoly(w))}
-              data-k="wall"
-              data-id={w.id}
-              className={`wall${w.exterior ? ' is-ext' : ''}${w.demolish ? ' is-demolish' : ''}${isSel('wall', w.id) ? ' is-sel' : ''}${w.kind !== 'wall' ? ` kind-${w.kind}` : ''}`}
-            />
-          ))}
-        </g>
-        <g className="openings">
-          {openings.map((o) => (
-            <OpeningShapeView key={o.id} o={o} w={wallById.get(o.wall)!} sel={isSel('opening', o.id)} />
-          ))}
-        </g>
-        <g className="stairs">
-          {m.stairs
-            .filter((s) => s.level === level || s.toLevel === level)
-            .map((s) => (
-              <polygon key={s.id} points={pts(s.polygon)} data-k="stair" data-id={s.id} className={`stair${isSel('stair', s.id) ? ' is-sel' : ''}`} />
-            ))}
-        </g>
+        {buildLayer}
         {/* the person's own measurements, and any drawn dimension in conflict */}
         <g className="dims">
           {m.dimensions
@@ -784,8 +806,8 @@ function PlanView({ model }: { model: Model }) {
         <g className="room-names">
           {rooms.map((r) => {
             if (r.polygon.length < 3) return null
-            const l = roomLabel(r)
-            l.at = clearOfItems(l.at, r.polygon, items, l.name.length * 7.5 * k, 30 * k)
+            const l0 = labels.get(r.id) ?? roomLabel(r)
+            const l = { ...l0, at: clearOfItems(l0.at, r.polygon, items, l0.name.length * 7.5 * k, 30 * k) }
             return (
               <text key={r.id} x={l.at[0]} y={l.at[1]} data-k="roomname" data-id={r.id} className={`room-name${r.id === selRoomId ? ' is-sel' : ''}`} style={{ fontSize: 13 * k }}>
                 <tspan x={l.at[0]}>{l.name}</tspan>
