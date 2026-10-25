@@ -17,8 +17,8 @@ type EditorUi = {
   wallT: number
 }
 
-/** Ops that record reality rather than design; allowed on the as-built without asking (07 section 9). */
-const RECORDS = new Set(['dimension', 'note', 'field_dimension'])
+/** Ops that record reality (or file ideas against it) rather than change the design: allowed on the as-built without asking (07 section 9). */
+const RECORDS = new Set(['dimension', 'note', 'field_dimension', 'add_inspiration', 'update_inspiration', 'remove_inspiration'])
 /** Schemes where the person already said yes to changing the as-built record this session. */
 const asBuiltOk = new Set<string>()
 export const useEditor = create<EditorUi>(() => ({ notice: null, confirm: null, busy: false, wallT: 4.5 }))

@@ -9,6 +9,7 @@ import { type Badge, type Comment, type Item, type Model, type Opening, type Ope
 import { formatFeetInches as fmt } from '../model/units'
 import { roomAt, roomClearDims, leftOf, pointOn, thick } from '../plan2d/geometry'
 import { ChecksPanel } from './Checks'
+import { InspirationPanel } from './InspirationPanel'
 import { clearSelection, handEdit, removeSelected, select, setTool, useEditor } from './editor'
 import { useStudio } from './store'
 
@@ -176,6 +177,9 @@ export function ContextPanel({ onHide }: { onHide: () => void }) {
           <button type="button" role="tab" aria-selected={tab === 'checks'} onClick={() => useStudio.setState({ ctxTab: 'checks' })}>
             Checks{shown ? <span className={`ctx-count${worst === 'blocks' ? ' is-code' : ''}`}>{shown}</span> : null}
           </button>
+          <button type="button" role="tab" aria-selected={tab === 'inspiration'} onClick={() => useStudio.setState({ ctxTab: 'inspiration' })}>
+            Inspiration
+          </button>
         </div>
         <button type="button" className="link" onClick={onHide}>
           Hide
@@ -184,6 +188,8 @@ export function ContextPanel({ onHide }: { onHide: () => void }) {
       <div className="ctx-body" role="tabpanel">
         {tab === 'checks' ? (
           <ChecksPanel />
+        ) : tab === 'inspiration' ? (
+          <InspirationPanel />
         ) : (
           <>
             {tool === 'wall' && <NewWallThickness />}

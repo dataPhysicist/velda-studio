@@ -104,3 +104,19 @@ describe('model choice and answers', () => {
     expect(a.ops).toHaveLength(1)
   })
 })
+
+describe('the fixture library in the prompt', () => {
+  it('lists the shower types that fit the bathroom when the talk is about showers, and nothing for a kitchen move', async () => {
+    const { a2 } = await import('../import/a2-fixture')
+    const m = a2().result.model
+    const bath = m.rooms.find((r) => r.name === 'Primary Bathroom')!
+    const p = buildPrompt({ model: m, text: 'find me the best shower for this bathroom', attachments: [], history: [], focus: { roomId: bath.id, roomName: bath.name, level: bath.level } })
+    expect(p).toContain('SHOWER TYPES THAT FIT the Primary Bathroom')
+    expect(p).toContain('- Steam shower: the ceiling is 9\'-0"')
+    expect(p).toContain('"op":"research","query":"...","kind":"product","results"')
+    expect(p.indexOf('SHOWER TYPES')).toBeGreaterThan(p.indexOf('MODEL:'))
+    expect(p.indexOf('SHOWER TYPES')).toBeLessThan(p.indexOf('RECENT CONVERSATION'))
+    const k = kitchen()
+    expect(buildPrompt({ model: k, text: 'move the sink to the island', attachments: [], history: [], focus: { roomId: null, roomName: null, level: null } })).not.toContain('SHOWER TYPES')
+  }, 60_000)
+})

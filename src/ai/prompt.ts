@@ -9,7 +9,8 @@ import { LIBRARY_FINISHES, ROLES } from '../lib/theme'
 import { KIND_LIST, opsPromptText } from '../model/table'
 import type { Model } from '../model/types'
 import type { Attachment, Message } from '../repo'
-import { describeModel } from './summary'
+import { fitsForPrompt } from '../library/fit'
+import { describeModel, roomsInDetail } from './summary'
 
 const CATALOG_HINT =
   'bathtub, shower-square, shower-angle, toilet, bathroom-sink, fridge, stove, hood, kitchen-counter, dining-table, dining-chair, sofa, livingroom-chair, coffee-table, double-bed, single-bed, bedside-table, dresser, closet, bookshelf, desk, office-chair, floor-lamp, ceiling-lamp, rectangular-carpet, round-carpet, indoor-plant, washing-machine, piano, television, round-mirror'
@@ -81,6 +82,8 @@ PRODUCTS: when N8 pastes a link to furniture, a fixture or a finish, read the pa
     `FOCUS: ${focus.roomName ? `room ${focus.roomId} "${focus.roomName}" on ${focus.level}` : focus.level ? `level ${focus.level}` : 'whole house'}. "Here" or "this room" means the focus.`,
     // 9. Model
     `MODEL:\n${describeModel(model, { focusRoomId: focus.roomId, focusLevel: focus.level, text, checks: p.checks, recentVersions: p.recentVersions })}`,
+    // 9b. The fixture library, only what fits the bathroom being talked about (07 section 7)
+    libraryFor(model, focus.roomId, text),
     // 10. Conversation
     `RECENT CONVERSATION:\n${hist || '(none)'}`,
     // 11. Last turn's skips, or the check results to report
@@ -94,6 +97,15 @@ PRODUCTS: when N8 pastes a link to furniture, a fixture or a finish, read the pa
     `N8: ${text}`,
   ]
   return sections.filter(Boolean).join('\n\n')
+}
+
+/** The shower types that fit the bathroom in focus (or named), when the talk is about fixtures. */
+function libraryFor(model: Model, focusId: string | null, text: string) {
+  if (!/\b(shower|tub|bath|fixture|layout|fit|best|option|recommend|wet room|steam|curbless)/i.test(text)) return ''
+  const rooms = roomsInDetail(model, { focusRoomId: focusId, text }).filter((r) => /bath|shower|wc|powder/i.test(r.name)).slice(0, 2)
+  if (!rooms.length) return ''
+  return `${rooms.map((r) => fitsForPrompt(model, r)).join('\n\n')}
+When N8 asks which shower (or tub) to get, recommend only types listed as fitting, sized as listed, two sentences each on the trade-off. For each type you recommend, search with web_search_exa for two real products a person can buy, and list them in one research op: {"op":"research","query":"...","kind":"product","results":[{"title":"...","url":"https://...","type":"walk_in","w":60,"d":36,"price":"$...","image":"https://..."}]} with real sizes from the product page (w along the wall, d deep, inches). Do not place anything unless asked.`
 }
 
 export function toolRules(text: string, attachments: Attachment[]) {

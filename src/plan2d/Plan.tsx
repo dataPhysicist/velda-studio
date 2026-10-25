@@ -10,6 +10,7 @@ import { parseLength } from '../import/dims'
 import { newId, type Op } from '../model/ops'
 import { clearSelection, handEdit, notify, removeSelected, select, setTool, useEditor } from '../app/editor'
 import { type Tool, useStudio } from '../app/store'
+import { CARD_MIME, fileUnder } from '../app/inspiration'
 import {
   across,
   along,
@@ -681,6 +682,18 @@ function PlanView({ model }: { model: Model }) {
           if (r) setView(frame(r.polygon))
         }}
         onWheel={onWheel}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes(CARD_MIME)) e.preventDefault()
+        }}
+        onDrop={(e) => {
+          // An inspiration card dropped on a room is filed under it.
+          const id = e.dataTransfer.getData(CARD_MIME)
+          if (!id) return
+          e.preventDefault()
+          const room = roomAt(model, level, toPlan(e))
+          if (room) void fileUnder(id, room.id)
+          else notify('Drop the card inside a room to file it there.')
+        }}
         onContextMenu={(e) => e.preventDefault()}
         role="application"
         aria-label={`Plan of ${model.levels.find((l) => l.id === level)?.name ?? level}`}

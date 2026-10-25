@@ -6,7 +6,7 @@ import type { Theme } from '../lib/theme'
 import { polygonBounds } from '../model/geom'
 import { isV1, migrateV1 } from '../model/migrate'
 import { type Op, applyOps, newId as sid } from '../model/ops'
-import type { Author, Comment, Model } from '../model/types'
+import type { Author, Comment, Inspiration, Model } from '../model/types'
 import { IN } from '../model/units'
 import { compileScene } from '../view3d/compile'
 import handChecked from '../../scripts/plan-openings/level2-asbuilt-walls.json'
@@ -51,7 +51,7 @@ type State = {
   /** Issue ids set aside in this scheme: dismissed (a note or should-fix) or acknowledged (structure). */
   setAside: { dismissed: string[]; acked: string[] }
   /** Which tab the right-hand panel shows. */
-  ctxTab: 'selection' | 'checks'
+  ctxTab: 'selection' | 'checks' | 'inspiration'
   /** A request for the plan to frame some points on a level (a check clicked in the panel). */
   frameReq: { level: string; pts: [number, number][]; key: number } | null
 }
@@ -430,13 +430,32 @@ export async function send(text: string, attachments: Attachment[] = []) {
     const { model: modelOps, actions, turn } = splitOps(ans.ops)
     const research = turn.filter((o) => o.op === 'research' && o.query)
     if (research.length) meta = { research: research.map((o) => String(o.query)) }
+    // Products Velda found become cards in the reply, each with a Place button.
+    const products = research
+      .flatMap((o) => (Array.isArray(o.results) ? o.results : []))
+      .filter((p: any) => p && typeof p.title === 'string' && typeof p.url === 'string' && /^https?:\/\//.test(p.url))
+      .slice(0, 12)
+      .map((p: any) => ({
+        title: String(p.title).slice(0, 120),
+        url: String(p.url),
+        ...(p.type ? { type: String(p.type) } : {}),
+        ...(Number(p.w) > 0 ? { w: Number(p.w) } : {}),
+        ...(Number(p.d) > 0 ? { d: Number(p.d) } : {}),
+        ...(p.price ? { price: String(p.price) } : {}),
+        ...(typeof p.image === 'string' && /^https:\/\//.test(p.image) ? { image: p.image } : {}),
+        room: room?.id ?? null,
+      }))
+    if (products.length) meta = { ...meta, products }
     const unclear = (list: string[]) => list.map((x) => plain(x.replace(/^[a-z_0-9]+( [^:]*)?: /, ''))).join('; ')
     if (modelOps.length) {
       // Velda never edits the record of the house as it is today: design changes go to a new scheme.
       // The ops are tried first, so a request that changes nothing does not leave an empty copy.
-      const records = modelOps.every((o) => o.op === 'note' || o.op === 'field_dimension')
+      const records = modelOps.every((o) => ['note', 'field_dimension', 'update_inspiration', 'remove_inspiration'].includes(o.op))
       const branching = asBuilt && !records
       const summary = ans.summary || 'Change from Velda'
+      // A product Velda placed from a link also becomes an inspiration card (07 section 6).
+      const products = productCards(modelOps, get().model!)
+      if (products.length) modelOps.push({ op: 'add_inspiration', entries: products })
       const res = applyOps(get().model!, modelOps, { author: 'ai', versionLabel: branching ? `v2 ${summary}` : nextVersionLabel(summary), focusLevel: room?.level ?? get().levelId })
       if (branching && res.applied) {
         await newSchemeFromCurrent(uniqueSchemeName(ans.summary || 'Option 1'))
@@ -504,6 +523,23 @@ export async function send(text: string, attachments: Attachment[] = []) {
   } finally {
     set({ thinking: null })
   }
+}
+
+/** Inspiration cards for products Velda placed from a link (props.url and props.image). */
+function productCards(ops: Op[], model: Model): Inspiration[] {
+  const out: Inspiration[] = []
+  for (const o of ops) {
+    const it = o.op === 'add_item' ? o : o.op === 'place' && o.item ? { ...o.item, room: o.room } : null
+    const props = it?.props
+    if (!props || typeof props.url !== 'string' || typeof props.image !== 'string' || !/^https?:/.test(props.image)) continue
+    const room = it.room ? model.rooms.find((r) => r.id === it.room || r.name.toLowerCase() === String(it.room).toLowerCase()) : null
+    let source = 'link'
+    try {
+      source = new URL(props.url).hostname.replace(/^www\./, '')
+    } catch {}
+    out.push({ id: sid('insp'), kind: 'product', url: props.url, image: props.image, title: String(it.label ?? 'Product'), source, tags: { style: [], palette: [], materials: [], fixtures: [String(it.kind ?? 'item').replace('_', ' ')] }, rooms: room ? [room.id] : [], addedBy: 'ai', createdAt: new Date().toISOString() })
+  }
+  return out
 }
 
 /** Velda's design options: one new scheme per option, branched from the head of this one. */

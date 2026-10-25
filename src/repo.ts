@@ -39,7 +39,12 @@ export type Message = {
   created_at?: string
 }
 
-export type MessageMeta = { choices?: { label: string; scheme_id: string; room?: string | null; level?: string | null }[]; research?: string[] }
+export type MessageMeta = {
+  choices?: { label: string; scheme_id: string; room?: string | null; level?: string | null }[]
+  research?: string[]
+  /** Products Velda found (research results), each placeable in the room the talk was about. */
+  products?: { title: string; url: string; type?: string; w?: number; d?: number; price?: string; image?: string; room?: string | null }[]
+}
 
 export interface Repo {
   kind: 'duckdb' | 'memory'

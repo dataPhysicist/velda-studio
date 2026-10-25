@@ -160,8 +160,20 @@ export function describeModel(m: Model, opts: SummaryOpts = {}): string {
     out.push(`THEMES (house: ${theme?.name ?? 'none'}):`)
     for (const id of themes) if (m.themes[id]) out.push(`- [${id}] ${themeBrief(m.themes[id]).split('\n').slice(0, 3).join(' ')}`)
   }
-  const insp = (m.inspiration ?? []).filter((x) => !detail.length || x.rooms.some((id) => detail.some((d) => d.id === id))).slice(0, 8)
-  if (insp.length) out.push('INSPIRATION:', ...insp.map((x) => `- ${x.title ?? x.kind}: ${[...x.tags.style, ...x.tags.materials].slice(0, 6).join(', ')}`))
+  // Inspiration for the rooms in detail (or the whole house), boards first; each with its sampled colors.
+  const insp = (m.inspiration ?? [])
+    .filter((x) => (detail.length ? x.rooms.some((id) => detail.some((d) => d.id === id)) : true))
+    .sort((a, b) => Number(b.kind === 'board') - Number(a.kind === 'board'))
+    .slice(0, 12)
+  if (insp.length)
+    out.push(
+      `INSPIRATION (${insp.length} of ${m.inspiration.length} cards):`,
+      ...insp.map((x) => {
+        const words = [...x.tags.style, ...x.tags.materials, ...x.tags.fixtures].slice(0, 7).join(', ')
+        const colors = x.tags.palette.slice(0, 5).map((p) => `${p.hex}${p.name ? ` ${p.name}` : ''}`).join(', ')
+        return `- ${x.id} ${x.kind}${x.parent ? ` in ${x.parent}` : ''} "${x.title ?? ''}"${x.source ? ` (${x.source})` : ''}${words ? `: ${words}` : ''}${colors ? `; colors ${colors}` : ''}`
+      }),
+    )
   const checks = (opts.checks ?? []).filter((i) => !detail.length || detail.some((d) => d.id === i.where.room)).slice(0, 10)
   if (checks.length) out.push('OPEN CHECKS:', ...checks.map((i) => `- ${i.severity === 'blocks' ? 'code' : i.severity === 'fix' ? 'should fix' : 'note'}: ${i.message}`))
   const notes = m.notes.filter((n) => n.locked).slice(-6)

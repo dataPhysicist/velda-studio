@@ -1,4 +1,8 @@
+import { addInspiration } from './inspiration'
+import { classifyLink } from '../inspiration/pinterest'
+import type { Source } from '../inspiration/ingest'
 import { Choices } from './Choices'
+import { Products } from './Products'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { finishFor, ROLES, swatches, type Theme } from '../lib/theme'
 import type { Attachment, Message } from '../repo'
@@ -604,6 +608,7 @@ function Bubble({ m, live }: { m: Message; live: boolean }) {
       )}
       <div className="bubble-body">{renderText(m.body)}</div>
       {!!m.meta?.choices?.length && <Choices choices={m.meta.choices} />}
+      {!!m.meta?.products?.length && <Products items={m.meta.products} />}
       {v && (
         <button type="button" className="ver-link" aria-current={v.id === headId} onClick={() => goToVersion(v.id)}>
           {v.id === headId ? `Showing version ${v.seq}` : `Show version ${v.seq}`}
@@ -793,14 +798,42 @@ const Composer = ({ ref }: { ref: React.RefObject<ComposerApi | null> }) => {
   }, [text])
 
   const uploading = atts.some((a) => a.uploading)
-  const canSend = ready && !thinking && !uploading && (text.trim() || atts.length)
+  const busy = useStudio((s) => !!s.activity)
+  const canSend = ready && !thinking && !busy && !uploading && (text.trim() || atts.length)
+  // 06 section 4: the box says what it will do with pictures and Pinterest links before sending.
+  const model = useStudio((s) => s.model)
+  const focus = useStudio((s) => s.roomId)
+  const pics = atts.filter((a) => /^image\//.test(a.type) && a.path)
+  const pinLinks = (text.match(/https?:\/\/\S+/g) ?? []).filter((u) => ['pin', 'board'].includes(classifyLink(u).kind))
+  const canInspire = !!(pics.length || pinLinks.length)
+  const [inspire, setInspire] = useState(true)
+  const [inspRoom, setInspRoom] = useState<string>('')
+  useEffect(() => {
+    if (!canInspire) {
+      setInspire(true)
+      setInspRoom('')
+    }
+  }, [canInspire])
+  const room = inspRoom || focus || ''
   const submit = () => {
     if (!canSend) return
-    const body = text
     const list = atts.map(({ key, uploading: _u, ...a }) => a)
     setText('')
     setAtts([])
-    void send(body, list)
+    if (canInspire && inspire) {
+      // Pictures and pins become inspiration; anything else said goes to Velda after.
+      const rest = pinLinks.reduce((t, u) => t.replace(u, ''), text).trim()
+      const others = list.filter((a) => !pics.some((p) => p.path === a.path))
+      void (async () => {
+        const sources: Source[] = []
+        for (const p of pics) sources.push({ path: p.path, name: p.name, blob: p.preview ? await fetch(p.preview).then((r) => r.blob()).catch(() => null) : null })
+        for (const url of pinLinks) sources.push({ url })
+        await addInspiration(sources, room ? [room] : [], pics.map(({ key: _k, uploading: _u, ...a }) => a))
+        if (rest || others.length) await send(rest, others)
+      })()
+      return
+    }
+    void send(text, list)
   }
 
   return (
@@ -811,6 +844,29 @@ const Composer = ({ ref }: { ref: React.RefObject<ComposerApi | null> }) => {
         submit()
       }}
     >
+      {canInspire && (
+        <div className="insp-line">
+          <label>
+            <input type="checkbox" checked={inspire} onChange={(e) => setInspire(e.target.checked)} />
+            Add {[pics.length && `${pics.length === 1 ? 'the picture' : `${pics.length} pictures`}`, pinLinks.length && (pinLinks.length === 1 ? `the ${classifyLink(pinLinks[0]).kind}` : `${pinLinks.length} Pinterest links`)].filter(Boolean).join(' and ')} to inspiration for
+          </label>
+          <label>
+            <span className="sr-only">Room</span>
+            <select value={room} onChange={(e) => setInspRoom(e.target.value)} disabled={!inspire}>
+              <option value="">the whole house</option>
+              {model?.rooms
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {!inspire && <span className="muted small">Velda will look at {pics.length ? 'them' : 'it'} in the chat instead.</span>}
+        </div>
+      )}
       {!!atts.length && (
         <div className="att-row">
           {atts.map((a) => (

@@ -1,0 +1,96 @@
+{
+  "source": "10-design-reference section 6; sizes are interior, width along the back wall by depth, in inches.",
+  "entries": [
+    {
+      "id": "alcove",
+      "name": "Alcove shower",
+      "min": [36, 36],
+      "ideal": [60, 36],
+      "sizes": [[60, 36], [48, 36], [36, 48], [36, 36]],
+      "walls": 3,
+      "needs": "three walls and a door or curtain",
+      "bestFor": "budget, hall baths, the common tub-to-shower swap",
+      "watchOut": "a hinged door must swing out"
+    },
+    {
+      "id": "walk_in",
+      "name": "Walk-in with a fixed glass panel (doorless)",
+      "min": [60, 36],
+      "ideal": [66, 42],
+      "sizes": [[72, 42], [66, 42], [60, 42], [60, 36]],
+      "walls": 2,
+      "needs": "enough length that the spray stays in, a half wall or 3/8 in panel, slope to the drain",
+      "bestFor": "primary baths, easy cleaning, no door hardware",
+      "watchOut": "under 60 in long it splashes the floor"
+    },
+    {
+      "id": "curbless",
+      "name": "Curbless (zero threshold)",
+      "min": [60, 36],
+      "ideal": [72, 42],
+      "sizes": [[72, 42], [66, 42], [60, 42], [60, 36]],
+      "walls": 2,
+      "needs": "a recessed subfloor or a linear drain at the back wall, 1/4 in per ft slope, a full waterproofing membrane, floor tile with DCOF 0.42 or better",
+      "bestFor": "aging in place, seamless floors, wet rooms",
+      "watchOut": "the floor has to drop 1 1/2 to 2 in or the drain goes linear; flag it to the contractor"
+    },
+    {
+      "id": "neo_angle",
+      "name": "Corner neo-angle",
+      "min": [36, 36],
+      "ideal": [42, 42],
+      "sizes": [[42, 42], [38, 38], [36, 36]],
+      "walls": 2,
+      "corner": true,
+      "needs": "two walls meeting in a corner, a five-sided base or tile",
+      "bestFor": "small baths, odd corners",
+      "watchOut": "tight inside; the door opens out into the room"
+    },
+    {
+      "id": "double",
+      "name": "Double (two person)",
+      "min": [72, 48],
+      "ideal": [96, 60],
+      "sizes": [[96, 60], [84, 48], [72, 48]],
+      "walls": 2,
+      "needs": "two heads or a head plus rain, a bench, two niches, a 48 in opening",
+      "bestFor": "primary baths",
+      "watchOut": "two heads at 2.5 gpm need 5 gpm of hot water; check the water heater"
+    },
+    {
+      "id": "steam",
+      "name": "Steam shower",
+      "min": [36, 36],
+      "ideal": [60, 48],
+      "sizes": [[60, 48], [48, 36], [36, 36]],
+      "walls": 3,
+      "maxCeiling": 96,
+      "needs": "an enclosure to the ceiling with a transom, a 7 to 8 ft ceiling sloped 1 to 2 in per ft, non-porous surfaces, a vapor-proof light, a generator within 25 ft, 50 cfm or more of exhaust, a bench, sealed doors",
+      "bestFor": "a spa feel",
+      "watchOut": "ceiling height and slope decide it early; check with the generator maker"
+    },
+    {
+      "id": "wet_room",
+      "name": "Wet room",
+      "min": [96, 72],
+      "ideal": [120, 96],
+      "sizes": [[120, 96], [96, 72]],
+      "walls": 2,
+      "room": true,
+      "needs": "the whole zone waterproofed, the tub inside the glass, a linear drain, curbless",
+      "bestFor": "tub and shower together in a smaller primary",
+      "watchOut": "everything in the zone gets wet; storage goes outside it"
+    },
+    {
+      "id": "tub_shower",
+      "name": "Tub and shower combination",
+      "min": [60, 30],
+      "ideal": [60, 36],
+      "sizes": [[60, 36], [60, 32], [60, 30]],
+      "walls": 3,
+      "needs": "an alcove, tempered glass or a curtain",
+      "bestFor": "kids, resale",
+      "watchOut": "32 in and 36 in tubs feel very different; measure the door it has to come through"
+    }
+  ]
+}

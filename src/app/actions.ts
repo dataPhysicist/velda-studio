@@ -188,12 +188,18 @@ async function renderRealistic(a: Op) {
   } else {
     sourcePath = await upload(`velda-studio/renders/${id}-view.png`, await snapshotView(1536, 1024))
   }
+  // Style references (07 section 8): the room's inspiration pictures first, then the theme's, then any
+  // Velda named; six at most.
   const refs: string[] = []
-  for (const im of (theme?.data.images ?? []).slice(0, 2)) {
-    if (im.url) refs.push(im.url)
-    else if (im.path) refs.push(await link(im.path))
+  const add = async (p: string | undefined) => {
+    if (!p || refs.length >= 6) return
+    const u = /^https?:/.test(p) ? p : await link(p).catch(() => '')
+    if (u && !refs.includes(u)) refs.push(u)
   }
-  for (const r of (Array.isArray(a.refs) ? a.refs : []).slice(0, 3)) refs.push(await link(String(r)))
+  const cards = room ? model.inspiration.filter((c) => c.kind !== 'board' && c.rooms.includes(room.id) && c.image) : []
+  for (const c of cards.slice(0, 4)) await add(c.image)
+  for (const im of (theme?.data.images ?? []).slice(0, 2)) await add(im.url ?? im.path)
+  for (const r of Array.isArray(a.refs) ? a.refs : []) await add(String(r))
   const images = [await link(sourcePath), ...(designPath ? [await link(designPath)] : []), ...refs]
   const photo = a.from && a.from !== 'view'
   const finishes = theme
