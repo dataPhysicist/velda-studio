@@ -26,9 +26,14 @@ if [ "${SKIP_CHECK:-}" != "1" ]; then
   fi
 fi
 
-git add -A src scripts tests schema docs .github toolbelt README.md package.json package-lock.json index.html \
-  vite.config.ts vitest.config.ts playwright.config.ts tsconfig.json tsconfig.node.json .gitignore 2>/dev/null || true
-commit "$MSG" || true
+# Only paths that exist: one missing path makes git add stage nothing at all.
+PATHS=()
+for p in src scripts tests schema docs .github toolbelt README.md package.json package-lock.json index.html \
+  vite.config.ts vitest.config.ts playwright.config.ts tsconfig.json tsconfig.node.json .gitignore; do
+  [ -e "$p" ] && PATHS+=("$p")
+done
+git add -A "${PATHS[@]}"
+if git diff --cached --quiet; then echo "Nothing new to commit before the build."; else commit "$MSG"; fi
 
 rm -rf dist
 STUDIO_ASSET_REF="$ASSET_REF" npm run build:cdn >/dev/null
