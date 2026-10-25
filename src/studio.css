@@ -520,3 +520,7 @@ input.fld-num.is-bad { border-color: var(--warn); }
 .product-body { display: grid; gap: 2px; align-content: start; }
 .product-title { font-size: 13px; color: var(--graphite); }
 .product-body .link { justify-self: start; }
+.ctx-head { gap: 8px; }
+.ctx-tabs { gap: 12px; min-width: 0; }
+.ctx-tabs button { font-size: 17px; white-space: nowrap; }
+.ctx-count { margin-left: 4px; }
