@@ -289,19 +289,20 @@ Decisions N8 needs: none.
 
 Next: Phase 7, renders: the prompt built from theme, inspiration and camera; the best quality path; labels; one before and after of the primary bath from the current 3D view; cost per render.
 
-## 2026-10-25  Phase 7  commit 5d5c111 (dev release, build 1b3ca76)
+## 2026-10-25  Phase 7  commits 5d5c111, 055dcc9 (dev releases, builds 1b3ca76 and 0190e22)
 
 Done:
 - The render prompt is the app's (decisions above); Velda adds only N8's words.
 - Every render shows "Mood, not dimensions" on the picture, and under it its quality, size, estimated cost, time and how many inspiration pictures it used (their names on hover). "Again at best quality (about $0.13)" makes it again with the Pro model at 2K from the current view.
 - The Replicate run reports its prediction id and run time, kept with the render.
+- Renders keep the view's shape and framing (055dcc9): the snapshot is taken in the supported ratio nearest the screen (a tall 3D view is 4:5, not 3:2) and that ratio is asked for outright. The Phase 6 render showed why: its view was snapped at 3:2 from a nearly square screen (cropped and zoomed), and with "match_input_image" the model followed a tall Pinterest reference and made a 2:3 picture with its own framing. Checked locally: the snapshot now matches the screen.
 
 Evidence:
-- `npm run check` green inside `scripts/release.sh`: 136 unit tests in 16 files (new `tests/ai/render.test.ts` 5: the camera inside the A2 primary bath at 5'-3" looking at the vanity wall, the cut-away view from above, the prompt from room, fixtures, theme, inspiration and camera with N8's words last, a photo render, the cost line), 11 browser tests (new `tests/e2e/render.spec.ts`: "Render the primary bath realistically from this view" in the 3D view through the real send path and render action with stand-ins for Velda and Replicate; the Replicate input is `google/nano-banana-2` at 1K with the app's prompt ending in N8's words; the render shows the label and "Standard, 1K · about $0.07 · 29 s"; the best quality button runs `google/nano-banana-pro` at 2K). Screenshot `docs/buildlog/phase7-render-labeled.jpg` (local preview).
+- `npm run check` green inside `scripts/release.sh`: 137 unit tests in 16 files (new `tests/ai/render.test.ts` 6, including the nearest ratio: the camera inside the A2 primary bath at 5'-3" looking at the vanity wall, the cut-away view from above, the prompt from room, fixtures, theme, inspiration and camera with N8's words last, a photo render, the cost line), 11 browser tests (new `tests/e2e/render.spec.ts`: "Render the primary bath realistically from this view" in the 3D view through the real send path and render action with stand-ins for Velda and Replicate; the Replicate input is `google/nano-banana-2` at 1K with the app's prompt ending in N8's words; the render shows the label and "Standard, 1K · about $0.07 · 29 s"; the best quality button runs `google/nano-banana-pro` at 2K). Screenshot `docs/buildlog/phase7-render-labeled.jpg` (local preview).
 - The Phase 6 render in the Toolbelt page (before this change, Velda chose best quality on her own): 77 s from asking to the picture, `nano-banana-pro` at its default size (1696 x 2528), about $0.13.
 
 Open:
-- The before and after render of the primary bath from the current 3D view in the signed-in page with build 1b3ca76: unverified in Toolbelt. The link to the built-in browser on N8's computer dropped before the release finished.
+- The before and after render of the primary bath from the current 3D view in the signed-in page with build 0190e22: unverified in Toolbelt. The link to the built-in browser on N8's computer dropped before the release finished.
 - Replicate's real price per image: unverified (estimates above).
 - `google/nano-banana-2.1` came out this month at about half the price of nano-banana-2 with sharper output; switching standard renders to it is a one-line change worth trying once the page check is done.
 
