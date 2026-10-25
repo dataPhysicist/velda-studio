@@ -7,8 +7,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "build:cdn": "STUDIO_CDN=1 vite build",
+    "build": "vite build && vite build --config vite.viewer.config.ts --logLevel warn",
+    "build:cdn": "STUDIO_CDN=1 vite build && vite build --config vite.viewer.config.ts --logLevel warn",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run",
