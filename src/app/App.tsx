@@ -533,6 +533,12 @@ function ThemeImage({ image }: { image: { url?: string; path?: string; name?: st
 
 // ------------------------------------------------------------------ versions
 
+/** When a version was made, the way a person says it ("Oct 25, 3:16 PM"). */
+function when(iso: string) {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
 function Versions() {
   const versions = useStudio((s) => s.versions)
   const headId = useStudio((s) => s.headId)
@@ -550,7 +556,7 @@ function Versions() {
       <ol ref={list}>
         {versions.map((v) => (
           <li key={v.id}>
-            <button type="button" aria-current={v.id === headId} onClick={() => goToVersion(v.id)} title={v.created_at ?? ''}>
+            <button type="button" aria-current={v.id === headId} onClick={() => goToVersion(v.id)} title={v.created_at ? when(v.created_at) : ''}>
               <span className="ver-n">{v.seq}</span>
               {v.summary}
             </button>

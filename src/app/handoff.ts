@@ -20,8 +20,8 @@ export type PartKey = 'sheets' | 'dxf' | 'json' | 'glb' | 'schedules' | 'changes
 export const PARTS: { key: PartKey; label: string; note: string }[] = [
   { key: 'sheets', label: 'PDF sheet set', note: 'cover, plans, demolition, changes, schedules, mood boards' },
   { key: 'dxf', label: 'DXF for CAD', note: 'R12, inches, one file per scheme' },
-  { key: 'json', label: 'Model data (JSON)', note: 'the full model, decimal inches' },
-  { key: 'glb', label: '3D model (GLB)', note: 'meters, y up, named by id' },
+  { key: 'json', label: 'Model data', note: 'every wall, opening and fixture in decimal inches, a .json file for other software' },
+  { key: 'glb', label: '3D model (GLB)', note: 'meters, y up, each piece named' },
   { key: 'schedules', label: 'Schedules (CSV)', note: 'rooms, doors, windows, fixtures' },
   { key: 'changes', label: 'Change log', note: 'against the as-built, in sentences' },
   { key: 'inspiration', label: 'Inspiration', note: 'stored pictures and a list with links' },

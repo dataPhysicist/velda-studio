@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
+import { expectPlain } from './plain'
 
 // 09 Phase 9, as a stranger: a new workspace opens on the welcome; the sample plan comes in through the
 // Confirm screen; the tour points at the real thing and each step finishes when it is done (or is
@@ -17,12 +18,14 @@ test('first run: welcome, sample plan, tour, palette and settings', async ({ pag
   await page.screenshot({ path: `${SHOTS}/phase9-first-run.jpg`, type: 'jpeg', quality: 80 })
   await welcome.getByRole('button', { name: 'Try the sample plan' }).click()
   await expect(page.getByTestId('import-confirm')).toBeVisible({ timeout: 12 * 60_000 })
+  await expectPlain(page, 'the Confirm screen') // 02 success criterion 6
   await page.getByRole('button', { name: 'Looks right, build my house' }).click()
 
   // The tour starts on its own after the first plan.
   const tour = page.getByRole('dialog', { name: 'Tour' })
   await expect(tour).toContainText('Step 1 of 5', { timeout: 120_000 })
   await expect(tour).toContainText('Click a room')
+  await expectPlain(page, 'the tour')
   await page.getByRole('navigation', { name: 'Room' }).getByRole('button', { name: 'Primary Bedroom', exact: true }).click()
   await expect(tour).toContainText('Step 2 of 5')
   await expect(page.locator('.composer textarea')).toHaveValue('Move the sink to the island')

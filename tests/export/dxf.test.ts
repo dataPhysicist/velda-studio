@@ -38,4 +38,38 @@ print(json.dumps({"version": doc.dxfversion, "errors": len(a.errors), "fixes": l
     expect(out.texts).toBeGreaterThan(30)
     expect(out.hit).toBe(true)
   }, 60_000)
+
+  // 02 success criterion 5, "at the right scale": the drawing is full size (one unit is one inch), so
+  // every dimension's text reads the length of its own line.
+  it('is drawn full size: every dimension text reads its line length within 1/2 in', () => {
+    const m = a2().result.model
+    const dir = mkdtempSync(path.join(tmpdir(), 'dxf-'))
+    const file = path.join(dir, 'a2.dxf')
+    writeFileSync(file, toDxf(m, { scheme: 'As-built', version: 'v1', date: '2026-10-25' }))
+    const script = `
+import sys, re, math, json, ezdxf
+doc = ezdxf.readfile(sys.argv[1])
+msp = doc.modelspace()
+lines = [e for e in msp.query('LINE') if e.dxf.layer.endswith('-A-ANNO-DIMS')]
+texts = [e for e in msp.query('TEXT') if e.dxf.layer.endswith('-A-ANNO-DIMS')]
+def inches(s):
+    m = re.match(r"(\\d+)'-(\\d+)(?: (\\d+)/(\\d+))?", s)
+    if not m: return None
+    return int(m[1]) * 12 + int(m[2]) + (int(m[3]) / int(m[4]) if m[3] else 0)
+ok, off = 0, []
+for L in lines:
+    a, b = L.dxf.start, L.dxf.end
+    mx, my = (a.x + b.x) / 2, (a.y + b.y) / 2
+    t = min(texts, key=lambda t: math.hypot(t.dxf.insert.x - mx, t.dxf.insert.y - my))
+    v = inches(t.dxf.text)
+    d = math.hypot(b.x - a.x, b.y - a.y)
+    if v is not None and abs(d - v) <= 0.5: ok += 1
+    else: off.append([t.dxf.text, round(d, 2)])
+print(json.dumps({"lines": len(lines), "ok": ok, "off": off}))
+`
+    const out = JSON.parse(execFileSync('python3', ['-I', '-c', script, file], { encoding: 'utf8' }))
+    console.log(`[dxf] ${out.ok} of ${out.lines} dimension texts read their line length`)
+    expect(out.lines).toBeGreaterThan(70)
+    expect(out.off).toEqual([])
+  }, 60_000)
 })
