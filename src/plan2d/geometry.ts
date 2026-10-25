@@ -139,7 +139,15 @@ export function roomClearDims(m: Model, r: Room): ClearDim[] {
   const poly = r.polygon
   const out: ClearDim[] = []
   if (poly.length < 3) return out
-  const c = poleOfInaccessibility(poly, 2)
+  // The inside of every edge is on the same hand, set by which way the outline winds (this also holds
+  // for the inward-facing edges of an L-shaped room, where a test against one inner point would not).
+  let twice = 0
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]
+    const b = poly[(i + 1) % poly.length]
+    twice += a[0] * b[1] - b[0] * a[1]
+  }
+  const hand = twice > 0 ? 1 : -1
   for (let i = 0; i < poly.length; i++) {
     const p = poly[i]
     const q = poly[(i + 1) % poly.length]
@@ -154,7 +162,7 @@ export function roomClearDims(m: Model, r: Room): ClearDim[] {
     const mid: Vec = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]
     const nx = -(q[1] - p[1]) / len
     const ny = (q[0] - p[0]) / len
-    const inward = (c[0] - mid[0]) * nx + (c[1] - mid[1]) * ny > 0 ? 1 : -1
+    const inward = hand
     const at: Vec = [mid[0] + nx * inward * 9, mid[1] + ny * inward * 9]
     out.push({ a: p, b: q, length: len, text: formatFeetInches(len), badge, at, vertical: Math.abs(q[1] - p[1]) > Math.abs(q[0] - p[0]) })
   }
