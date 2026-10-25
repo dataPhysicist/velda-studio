@@ -9,7 +9,7 @@ import { cancelConfirm, redo, undo, useEditor } from './editor'
 import { ImportFlow } from './Import'
 import { startImport, useImport } from './importFlow'
 import { Stage } from './Stage'
-import { type Look, enterWalk, exitWalk, focusOn, goToVersion, isDeep, newSchemeFromCurrent, openScheme, send, stepVersion, uploadAttachment, uploadVideo, useStudio } from './store'
+import { type Look, enterWalk, exitWalk, focusOn, goToVersion, isDeep, newSchemeFromCurrent, openScheme, send, stepVersion, uniqueSchemeName, uploadAttachment, uploadVideo, useStudio } from './store'
 
 declare const __STUDIO_ASSET_BASE__: string
 
@@ -110,6 +110,7 @@ function TitleBlock() {
   }, [model, levelId])
   const room = model?.rooms.find((r) => r.id === roomId)
   const [copying, setCopying] = useState(false)
+  const [naming, setNaming] = useState<string | null>(null) // the new scheme's name while it is being typed
 
   return (
     <header className="title-block">
@@ -125,19 +126,35 @@ function TitleBlock() {
             ))}
           </select>
         </label>
-        <button
-          type="button"
-          className="link"
-          onClick={async () => {
-            const name = window.prompt('Name the new scheme', `${schemes.find((s) => s.id === schemeId)?.name ?? 'Scheme'} (copy)`)
-            if (!name) return
-            setCopying(true)
-            await newSchemeFromCurrent(name)
-            setCopying(false)
-          }}
-        >
-          {copying ? 'Saving…' : 'Save as a new scheme'}
-        </button>
+        {naming === null ? (
+          <button type="button" className="link" onClick={() => setNaming(uniqueSchemeName(`${schemes.find((s) => s.id === schemeId)?.name ?? 'Scheme'} (copy)`))}>
+            {copying ? 'Saving…' : 'Save as a new scheme'}
+          </button>
+        ) : (
+          <form
+            className="scheme-name"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              const name = naming.trim()
+              if (!name) return
+              setNaming(null)
+              setCopying(true)
+              await newSchemeFromCurrent(uniqueSchemeName(name))
+              setCopying(false)
+            }}
+          >
+            <label>
+              <span className="sr-only">Name of the new scheme</span>
+              <input autoFocus value={naming} onChange={(e) => setNaming(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && setNaming(null)} />
+            </label>
+            <button type="submit" className="btn small primary">
+              Save
+            </button>
+            <button type="button" className="link small" onClick={() => setNaming(null)}>
+              Cancel
+            </button>
+          </form>
+        )}
         <BringInPlan />
         <TestDataNote />
       </div>

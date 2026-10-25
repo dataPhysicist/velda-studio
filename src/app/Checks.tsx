@@ -9,7 +9,7 @@ import { pointAt } from '../model/geom'
 import type { Op } from '../model/ops'
 import type { Model, Vec } from '../model/types'
 import { handEdit, select } from './editor'
-import { type SelKind, frameOn, setIssueAside, useStudio } from './store'
+import { type SelKind, focusOn, frameOn, setIssueAside, useStudio } from './store'
 
 const WORD: Record<Issue['severity'], string> = { blocks: 'Code', fix: 'Should fix', note: 'Note' }
 
@@ -159,6 +159,8 @@ function show(model: Model, i: Issue) {
   // Small things are framed with their room around them, so the plan reads.
   const room = i.where.room ? model.rooms.find((x) => x.id === i.where.room) : null
   if (room && pts.length < 12) pts.push(...room.polygon)
+  // The issue's room becomes the focus (Velda's "here"), or its level when it is in no room.
+  focusOn({ roomId: room?.id ?? null, levelId: i.where.level })
   if (sel) select(sel.kind, sel.id)
   frameOn(i.where.level, pts as [number, number][])
 }

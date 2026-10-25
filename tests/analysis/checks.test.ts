@@ -103,6 +103,21 @@ describe('checker', () => {
     })
   })
 
+  describe('fixtures in each other\'s way', () => {
+    it('flags a counter run moved into a tall cabinet, but not a sink set into its counter', () => {
+      const m = house('Kitchen')
+      m.items.push(item('run', 'base_cabinet', 50, 15, 60, 24), item('oven', 'oven_tower', 85, 15, 30, 26, { h: 84 }), item('sk', 'sink', 35, 15, 30, 20))
+      const [i] = of(m, 'items-overlap')
+      expect(i).toMatchObject({ severity: 'fix', where: { ids: ['run', 'oven'] } })
+      expect(i.message).toBe('The base cabinet runs into the oven tower.')
+      expect(of(m, 'items-overlap')).toHaveLength(1)
+      m.items[1].x = 100
+      expect(of(m, 'items-overlap')).toEqual([])
+      m.items.push(item('rg', 'range', 65, 16, 30, 26)) // set into the run, standing 2" proud as installed
+      expect(of(m, 'items-overlap')).toEqual([])
+    })
+  })
+
   describe('kitchens', () => {
     it('measures the aisle between counters and the island', () => {
       const m = house('Kitchen')

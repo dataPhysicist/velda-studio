@@ -108,6 +108,7 @@ export function runChecks(m: Model, opts: CheckOptions = {}): Issue[] {
     }
   }
 
+  checkOverlaps(m, push)
   checkDoors(m, push, roomName)
   checkHalls(m, push)
   checkEgress(m, push)
@@ -270,6 +271,27 @@ function checkFridgeDoor(m: Model, it: Item, where: Issue['where'], push: Push) 
   }
   const island = m.items.find((x) => x.kind === 'island' && x.level === it.level && overlaps(shrink(arc), footprint(x)))
   if (island) push({ severity: 'fix', rule: 'fridge-door', where: { ...where, ids: [it.id, island.id] }, message: `The ${lc(nameOf(it))} door hits the ${lc(nameOf(island))} when it opens.` })
+}
+
+// ------------------------------------------------------------------ fixtures in each other's way
+
+/** Two floor fixtures partly in the same place (a counter run moved into a tall oven). A sink in its
+ * counter, a bench in a shower or anything else fully inside another is a nesting, not a clash. */
+function checkOverlaps(m: Model, push: Push) {
+  const floor = m.items.filter((it) => onFloor(it) && it.kind !== 'glass' && it.w > 1 && it.d > 1)
+  const inside = (a: Vec[], b: Vec[]) => a.every((p) => pointInPolygon(p, b))
+  for (let i = 0; i < floor.length; i++)
+    for (let j = i + 1; j < floor.length; j++) {
+      const a = floor[i]
+      const b = floor[j]
+      if (a.level !== b.level) continue
+      const pa = shrink(footprint(a), 1)
+      const pb = shrink(footprint(b), 1)
+      if (hostOf(m, a)?.id === b.id || hostOf(m, b)?.id === a.id) continue // a range set into its counter run
+      if (!overlaps(pa, pb) || inside(pa, footprint(b)) || inside(pb, footprint(a))) continue
+      const room = roomOf(m, a.level, [a.x, a.y])
+      push({ severity: 'fix', rule: 'items-overlap', where: { level: a.level, room: room?.id, ids: [a.id, b.id] }, message: `The ${lc(nameOf(a))} runs into the ${lc(nameOf(b))}.` })
+    }
 }
 
 // ------------------------------------------------------------------ doors and halls

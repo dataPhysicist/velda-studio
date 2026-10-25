@@ -35,6 +35,16 @@ test('chat: the three kitchen changes each land as one version; analyze and prop
     const s = (window as any).__studio?.store?.getState?.()
     return !!s?.model && !s.status && !s.error
   })
+  // Work on a copy, named in place (no browser dialog).
+  await page.getByRole('button', { name: 'Save as a new scheme' }).click()
+  const name = page.getByRole('textbox', { name: 'Name of the new scheme' })
+  await expect(name).toHaveValue('Local preview (copy)')
+  await name.fill('Kitchen chat test')
+  await name.press('Enter')
+  await expect.poll(async () => {
+    const s = await state(page)
+    return s.schemes.find((x: any) => x.id === s.schemeId)?.name
+  }).toBe('Kitchen chat test')
   await page.keyboard.press('1')
   await page.getByRole('navigation', { name: 'Level' }).getByRole('button', { name: 'Level 1' }).click()
   const kitchen = await page.evaluate(() => (window as any).__studio.store.getState().model.rooms.find((r: any) => r.name === 'Kitchen').id)

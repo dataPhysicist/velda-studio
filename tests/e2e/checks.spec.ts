@@ -60,6 +60,7 @@ test('checks: a toilet 12 in from a wall is flagged and clears when moved', asyn
   // Clicking it selects the toilet and frames the bath in the plan.
   await row.locator('.issue-main').click()
   await expect.poll(async () => (await st(page)).selection).toEqual([{ kind: 'item', id: 't-check' }])
+  await expect(page.locator('h1.room-title')).toHaveText('Hall Bath') // the issue's room is now the focus
   const onScreen = await page.evaluate(() => {
     const it = (window as any).__studio.store.getState().model.items.find((x: any) => x.id === 't-check')
     const p = (window as any).__plan.toScreen([it.x, it.y])
