@@ -74,6 +74,14 @@ describe('inspiration ingest', () => {
     expect(r.said[0]).toMatch(/full link/)
   })
 
+  it('takes a picture by its address (dragged from another tab) and measures it in the sandbox', async () => {
+    const asked: string[] = []
+    const r = await ingest([{ url: 'https://i.pinimg.com/564x/b3/6d/ea/white-oak-vanity.jpg' }], ['r1'], { sdk: fakeSdk(asked), upload: async () => {}, progress: () => {} })
+    expect(r.entries[0]).toMatchObject({ kind: 'image', image: 'https://i.pinimg.com/564x/b3/6d/ea/white-oak-vanity.jpg', source: 'i.pinimg.com' })
+    expect(asked[0]).toContain('"https://i.pinimg.com/564x/b3/6d/ea/white-oak-vanity.jpg"')
+    expect(r.entries[0].sampled).toEqual([{ hex: '#f2f3f3', share: 0.5 }, { hex: '#dcdedf', share: 0.4 }])
+  })
+
   it('points Velda at stored pictures by path and lists their measured colors', () => {
     const e: Inspiration = { id: 'a', kind: 'image', image: 'velda-studio/inspiration/a.jpg', title: 'bath', sampled: [{ hex: '#ffffff', share: 0.6 }], tags: { style: [], palette: [], materials: [], fixtures: [] }, rooms: [], addedBy: 'user', createdAt: '' }
     const p = tagPrompt([e])

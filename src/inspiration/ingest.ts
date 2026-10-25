@@ -71,6 +71,9 @@ export async function ingest(sources: Source[], rooms: string[], deps: IngestDep
         } catch (err) {
           said.push(`${(err as Error).message}.`)
         }
+      } else if (link.kind === 'image') {
+        // A picture on the web: shown from its address, measured in Velda's sandbox.
+        entries.push(base('image', { image: link.url, url: link.url, source: hostOf(link.url), title: nameOf(decodeURIComponent(link.url.split('/').pop() ?? '')) }))
       } else if (link.kind === 'pin_short') {
         said.push(`Short pin.it links need opening in Pinterest first; paste the pin's full link (pinterest.com/pin/...) instead.`)
       } else {

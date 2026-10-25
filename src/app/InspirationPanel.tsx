@@ -151,7 +151,7 @@ const tagsOf = (c: Inspiration) => [...c.tags.style, ...c.tags.materials, ...c.t
 
 function linkWords(link: string) {
   const k = classifyLink((link.match(/https?:\/\/\S+/) ?? [''])[0]).kind
-  return k === 'pin' ? 'A Pinterest pin: its picture is added and tagged.' : k === 'board' ? 'A Pinterest board: every picture Pinterest shares from it is added and tagged.' : k === 'pin_short' ? 'A short pin.it link: open it in Pinterest and paste the full pin link instead.' : 'A web page: Velda reads it and adds its main picture.'
+  return k === 'image' ? 'A picture: it is added and tagged.' : k === 'pin' ? 'A Pinterest pin: its picture is added and tagged.' : k === 'board' ? 'A Pinterest board: every picture Pinterest shares from it is added and tagged.' : k === 'pin_short' ? 'A short pin.it link: open it in Pinterest and paste the full pin link instead.' : 'A web page: Velda reads it and adds its main picture.'
 }
 
 function Card({ c, model, picked, onPick }: { c: Inspiration; model: Model; picked: boolean; onPick: (on: boolean) => void }) {

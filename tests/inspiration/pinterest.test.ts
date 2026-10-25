@@ -14,6 +14,8 @@ describe('Pinterest links', () => {
     expect(classifyLink('https://uk.pinterest.com/someone/marble-shower-tray-finish-anti-slip/')).toEqual({ kind: 'board', user: 'someone', board: 'marble-shower-tray-finish-anti-slip' })
     expect(classifyLink('https://www.pinterest.com/ideas/marble-walk-in-shower-ideas/943134054659/').kind).toBe('url')
     expect(classifyLink('https://www.houzz.com/photos/query/Primary').kind).toBe('url')
+    expect(classifyLink('https://i.pinimg.com/564x/17/7c/fc/177c.jpg')).toEqual({ kind: 'image', url: 'https://i.pinimg.com/564x/17/7c/fc/177c.jpg' })
+    expect(classifyLink('https://example.com/photos/bath.webp?w=800').kind).toBe('image')
   })
 
   it('reads one pin: its big picture, a clean title, the source site and its color', () => {

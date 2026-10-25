@@ -2,7 +2,7 @@
 // widget endpoints (widgets.pinterest.com/v3/pidgets), which answer the page directly with the
 // pin's picture, description, source site and dominant color. No sign-in, no OAuth (not in 1.0).
 
-export type LinkKind = { kind: 'pin'; id: string } | { kind: 'pin_short'; url: string } | { kind: 'board'; user: string; board: string } | { kind: 'url'; url: string }
+export type LinkKind = { kind: 'pin'; id: string } | { kind: 'pin_short'; url: string } | { kind: 'board'; user: string; board: string } | { kind: 'image'; url: string } | { kind: 'url'; url: string }
 
 const PIN_HOST = /^(?:[a-z]{2,3}\.)?pinterest\.(?:com|co\.uk|ca|com\.au|de|fr|es|it|jp|ie|nz|at|ch|pt|se|dk|cl|com\.mx)$/i
 const NOT_BOARD = new Set(['pin', 'ideas', 'search', 'today', 'explore', 'business', 'settings', 'categories', 'topics', 'shopping', 'videos', 'news_hub', 'login', 'password'])
@@ -16,6 +16,8 @@ export function classifyLink(raw: string): LinkKind {
     return { kind: 'url', url: raw.trim() }
   }
   if (/^pin\.it$/i.test(u.hostname)) return { kind: 'pin_short', url: u.href }
+  // A picture itself (dragging an image out of another browser tab drops its address).
+  if (/\.(jpe?g|png|webp|gif|avif)$/i.test(u.pathname) || /^i\.pinimg\.com$/i.test(u.hostname)) return { kind: 'image', url: u.href }
   if (!PIN_HOST.test(u.hostname)) return { kind: 'url', url: u.href }
   const parts = u.pathname.split('/').filter(Boolean)
   if (parts[0] === 'pin' && parts[1]) {
