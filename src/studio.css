@@ -527,3 +527,30 @@ input.fld-num.is-bad { border-color: var(--warn); }
 .compare-label { position: absolute; left: 8px; bottom: 8px; font-size: 11px; letter-spacing: .02em; background: rgba(35, 40, 44, 0.7); color: #fff; padding: 2px 8px; border-radius: 10px; pointer-events: none; }
 .render-line { margin: -2px 0 6px; line-height: 1.4; }
 .render-line .link { display: block; margin-top: 2px; }
+
+/* ---------------------------------------------------------------- export and share */
+.dialog { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 18px 22px 20px; width: min(560px, 92vw); max-height: 86vh; overflow: auto; }
+.dialog.wide { width: min(920px, 94vw); }
+.dialog-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.dialog h2 { font: 400 28px/1.15 var(--serif); margin: 0; }
+.dialog h3 { font: 600 13px var(--sans); text-transform: uppercase; letter-spacing: .04em; color: var(--slate); margin: 14px 0 6px; }
+.handoff { display: grid; grid-template-columns: 1.1fr 1fr; gap: 24px; }
+.handoff-check { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: 13px; }
+.handoff-check > li { display: grid; grid-template-columns: 18px 1fr; gap: 6px; }
+.handoff-check .mark { font-weight: 700; text-align: center; }
+.handoff-check .is-ok .mark { color: var(--verdigris); }
+.handoff-check .is-missing .mark { color: var(--warn); }
+.handoff-check ul { margin: 2px 0 0; padding-left: 16px; color: var(--slate); }
+.handoff-parts { list-style: none; padding: 0; margin: 0 0 10px; display: grid; gap: 6px; }
+.handoff-parts label { display: flex; gap: 8px; align-items: baseline; }
+.handoff-parts .is-off { opacity: .55; }
+.handoff-paper { border: 0; padding: 0; margin: 0 0 12px; display: flex; gap: 14px; align-items: center; }
+.handoff-done { margin-top: 12px; }
+.handoff-done ul { padding-left: 16px; font-size: 13px; }
+.share-make { display: flex; gap: 12px; align-items: center; margin: 12px 0; }
+.share-link { display: flex; gap: 8px; align-items: center; }
+.share-link input { flex: 1; font: 12px var(--mono, monospace); padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; }
+.share-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; font-size: 13px; }
+.share-list .is-off { opacity: .6; }
+.share-actions { display: flex; gap: 12px; }
+@media (max-width: 760px) { .handoff { grid-template-columns: 1fr; } }

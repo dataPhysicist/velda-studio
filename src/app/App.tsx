@@ -3,6 +3,7 @@ import { addInspiration } from './inspiration'
 import { classifyLink } from '../inspiration/pinterest'
 import type { Source } from '../inspiration/ingest'
 import { Choices } from './Choices'
+import { ExportDialog, ShareDialog } from './Handoff'
 import { Products } from './Products'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { finishFor, ROLES, swatches, type Theme } from '../lib/theme'
@@ -161,6 +162,7 @@ function TitleBlock() {
           </form>
         )}
         <BringInPlan />
+        <HandoffButtons />
         <TestDataNote />
       </div>
       <h1 className="room-title">{room?.name ?? (levelId ? model?.levels.find((l) => l.id === levelId)?.name : 'Whole house')}</h1>
@@ -189,6 +191,23 @@ function TitleBlock() {
         ))}
       </nav>
     </header>
+  )
+}
+
+/** Share a read-only link, or build the package for a designer or contractor. */
+function HandoffButtons() {
+  const [open, setOpen] = useState<'share' | 'export' | null>(null)
+  return (
+    <>
+      <button type="button" className="link" onClick={() => setOpen('share')}>
+        Share
+      </button>
+      <button type="button" className="link" onClick={() => setOpen('export')}>
+        Export
+      </button>
+      {open === 'share' && <ShareDialog onClose={() => setOpen(null)} />}
+      {open === 'export' && <ExportDialog onClose={() => setOpen(null)} />}
+    </>
   )
 }
 

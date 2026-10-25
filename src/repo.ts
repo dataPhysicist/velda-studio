@@ -73,6 +73,8 @@ export interface Repo {
   model(versionId: string): Promise<StoredModel | null>
   addVersion(v: Version, model: Model): Promise<void>
   comments(schemeId: string): Promise<Comment[]>
+  /** Replies to these comments, oldest first. */
+  replies(commentIds: string[]): Promise<{ comment_id: string; body: string; author: string; created_at: string }[]>
   saveComment(c: Comment): Promise<void>
   messages(schemeId: string): Promise<Message[]>
   addMessage(m: Message): Promise<void>
@@ -237,6 +239,11 @@ export class DuckRepo implements Repo {
     )
     return rows.map((r) => ({ id: r.id, scheme_id: r.scheme_id, level: r.level, at: [Number(r.at_x), Number(r.at_y)], target: r.target ?? undefined, body: r.body, author: r.author, resolved: !!r.resolved, created_at: r.created_at })) as Comment[]
   }
+  async replies(commentIds: string[]) {
+    if (!commentIds.length) return []
+    const rows = await this.q(`SELECT comment_id, body, author, CAST(created_at AS VARCHAR) created_at FROM comment_replies WHERE comment_id IN (${commentIds.map(lit).join(', ')}) ORDER BY created_at`)
+    return rows.map((r) => ({ comment_id: String(r.comment_id), body: String(r.body ?? ''), author: String(r.author ?? ''), created_at: String(r.created_at ?? '') }))
+  }
   async saveComment(c: Comment) {
     await this.q(
       `INSERT INTO comments (id, scheme_id, level, at_x, at_y, target, body, author, resolved) VALUES (${lit(c.id)}, ${lit(c.scheme_id)}, ${lit(c.level)}, ${Number(c.at[0])}, ${Number(c.at[1])}, ${lit(c.target ?? null)}, ${lit(c.body)}, ${lit(c.author)}, ${c.resolved ? 'true' : 'false'})
@@ -306,6 +313,10 @@ export class MemoryRepo implements Repo {
   async comments(schemeId: string) {
     return this.c.filter((x) => x.scheme_id === schemeId)
   }
+  async replies(commentIds: string[]) {
+    return this.r.filter((x) => commentIds.includes(x.comment_id))
+  }
+  r: { comment_id: string; body: string; author: string; created_at: string }[] = []
   async saveComment(c: Comment) {
     this.c = [...this.c.filter((x) => x.id !== c.id), c]
   }

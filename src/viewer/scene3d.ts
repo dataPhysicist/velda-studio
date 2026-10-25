@@ -29,19 +29,27 @@ export function buildScene(T: THREE, m: Model, o: SceneOpts): { group: THREE_NS.
   const itemMat = new T.MeshStandardMaterial({ color: '#ffffff', roughness: 0.6 })
   const darkMat = new T.MeshStandardMaterial({ color: '#4a5257', roughness: 0.7 })
   let meshes = 0
-  const box = (w: number, h: number, d: number, mat: THREE_NS.Material, x: number, y: number, z: number, rotY: number) => {
+  // Every node is named by its model id (a wall's pieces sit in a group named for the wall), so the
+  // GLB export reads like the model.
+  let parent: THREE_NS.Object3D = g
+  const box = (w: number, h: number, d: number, mat: THREE_NS.Material, x: number, y: number, z: number, rotY: number, name = '') => {
     if (w <= 0.001 || h <= 0.001 || d <= 0.001) return
     const mesh = new T.Mesh(new T.BoxGeometry(w, h, d), mat)
     mesh.position.set(x, y, z)
     mesh.rotation.y = rotY
     mesh.castShadow = true
     mesh.receiveShadow = true
-    g.add(mesh)
+    mesh.name = name
+    parent.add(mesh)
     meshes++
   }
   const bounds = new T.Box3()
   for (const lv of shown) {
     const y0 = lv.elev * IN
+    const levelGroup = new T.Group()
+    levelGroup.name = lv.id
+    g.add(levelGroup)
+    parent = levelGroup
     // Floors.
     for (const r of m.rooms.filter((x) => x.level === lv.id && x.polygon.length >= 3)) {
       const shape = new T.Shape(r.polygon.map(([x, y]) => new T.Vector2(x * IN, -y * IN)))
@@ -50,7 +58,8 @@ export function buildScene(T: THREE, m: Model, o: SceneOpts): { group: THREE_NS.
       const mesh = new T.Mesh(geo, new T.MeshStandardMaterial({ color: themeColor(m, 'floors', '#d8ccb6', r.theme), roughness: 0.8, side: T.DoubleSide }))
       mesh.position.y = y0 + 0.002
       mesh.receiveShadow = true
-      g.add(mesh)
+      mesh.name = r.id
+      levelGroup.add(mesh)
       meshes++
     }
     // Walls, split around openings.
@@ -74,8 +83,12 @@ export function buildScene(T: THREE, m: Model, o: SceneOpts): { group: THREE_NS.
         const z1c = Math.min(z1, top)
         if (z1c <= z0 || s1 - s0 < 0.1) return
         const [x, y, z] = at((s0 + s1) / 2, z0, z1c)
-        box((s1 - s0) * IN, (z1c - z0) * IN, t * IN, mat, x, y, z, rot)
+        box((s1 - s0) * IN, (z1c - z0) * IN, t * IN, mat, x, y, z, rot, w.id)
       }
+      const wallGroup = new T.Group()
+      wallGroup.name = w.id
+      levelGroup.add(wallGroup)
+      parent = wallGroup
       const ops = m.openings.filter((x) => x.wall === w.id).sort((a, b) => a.at - b.at)
       let s = 0
       for (const op of ops) {
@@ -87,11 +100,12 @@ export function buildScene(T: THREE, m: Model, o: SceneOpts): { group: THREE_NS.
         piece(a, b, Math.min(op.h, H), H)
         if (op.kind === 'window' && !o.cut) {
           const [x, y, z] = at((a + b) / 2, sill, Math.min(op.h, H))
-          box((b - a) * IN, (Math.min(op.h, H) - sill) * IN, 0.4 * IN, glassMat, x, y, z, rot)
+          box((b - a) * IN, (Math.min(op.h, H) - sill) * IN, 0.4 * IN, glassMat, x, y, z, rot, op.id)
         }
         s = Math.max(s, b)
       }
       piece(s, L, 0, H)
+      parent = levelGroup
       bounds.expandByPoint(new T.Vector3(w.a[0] * IN, y0, w.a[1] * IN))
       bounds.expandByPoint(new T.Vector3(w.b[0] * IN, y0 + H * IN, w.b[1] * IN))
     }
@@ -100,7 +114,7 @@ export function buildScene(T: THREE, m: Model, o: SceneOpts): { group: THREE_NS.
       const h = Math.max(1, it.h)
       const z = it.z ?? 0
       const mat = ['range', 'fridge', 'dishwasher', 'oven_tower', 'washer', 'dryer'].includes(it.kind) ? darkMat : itemMat
-      box(it.w * IN, (o.cut ? Math.min(h, Math.max(1, 42 - z)) : h) * IN, it.d * IN, mat, it.x * IN, y0 + (z + (o.cut ? Math.min(h, Math.max(1, 42 - z)) : h) / 2) * IN, it.y * IN, (it.rot * Math.PI) / 180)
+      box(it.w * IN, (o.cut ? Math.min(h, Math.max(1, 42 - z)) : h) * IN, it.d * IN, mat, it.x * IN, y0 + (z + (o.cut ? Math.min(h, Math.max(1, 42 - z)) : h) / 2) * IN, it.y * IN, (it.rot * Math.PI) / 180, it.id)
     }
   }
   const center = new T.Vector3()
