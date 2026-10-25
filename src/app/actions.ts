@@ -8,7 +8,7 @@ import type { Model as StudioModel } from '../model/types'
 import { assetRegistry } from '../view3d/compile'
 import { MODELS, outputUrls, runReplicate } from '../lib/replicate'
 import type { Attachment, Capture } from '../repo'
-import { describeCamera, type Quality, RENDER_RUNS, renderPrompt } from '../ai/render'
+import { describeCamera, nearestRatio, type Quality, RENDER_RUNS, renderPrompt } from '../ai/render'
 import { snapshotView, viewPose } from './ViewerExtras'
 import { addMessage, commitVersion, rerender, useStudio } from './store'
 
@@ -185,14 +185,16 @@ async function renderRealistic(a: Op) {
   // The camera in words, from the 3D view as it is now (a photo keeps its own camera).
   const pose = photo ? null : viewPose()
   const camera = pose ? describeCamera(model, room?.level ?? get().levelId, pose) : null
+  // The render keeps the shape of the view (or the photo), asked for outright.
+  const shape = nearestRatio(photo ? ((await photoAspect(String(a.from))) ?? 1.5) : (pose?.aspect ?? 1.5))
   let sourcePath: string
   let designPath: string | null = null
   if (photo) {
     sourcePath = String(a.from)
     // A view of the design from the 3D model helps hold the layout; the photo holds the camera.
-    designPath = await upload(`velda-studio/renders/${id}-design.png`, await snapshotView(1536, 1024)).catch(() => null)
+    designPath = await upload(`velda-studio/renders/${id}-design.png`, await snapshotView(shape.w, shape.h)).catch(() => null)
   } else {
-    sourcePath = await upload(`velda-studio/renders/${id}-view.png`, await snapshotView(1536, 1024))
+    sourcePath = await upload(`velda-studio/renders/${id}-view.png`, await snapshotView(shape.w, shape.h))
   }
   // Style references (07 section 8): the room's inspiration pictures first, then the theme's, then any
   // Velda named; six at most.
@@ -226,7 +228,7 @@ async function renderRealistic(a: Op) {
   const res = await runReplicate(sdk, run.model, {
     prompt,
     image_input: images,
-    aspect_ratio: 'match_input_image',
+    aspect_ratio: shape.ratio,
     resolution: run.resolution,
     output_format: 'jpg',
   })
@@ -246,6 +248,7 @@ async function renderRealistic(a: Op) {
         quality,
         model: run.model,
         resolution: run.resolution,
+        ratio: shape.ratio,
         usd: run.usd,
         seconds: Math.round(seconds),
         ...(res.predict_time ? { predict: Math.round(res.predict_time) } : {}),
@@ -259,6 +262,20 @@ async function renderRealistic(a: Op) {
       },
     },
   })
+}
+
+/** Width over height of a stored photo, or null when it cannot be read. */
+async function photoAspect(path: string): Promise<number | null> {
+  try {
+    const src = /^https?:/.test(path) ? path : await get().sdk!.readImage(path)
+    if (!src) return null
+    const img = new Image()
+    img.src = src
+    await img.decode()
+    return img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : null
+  } catch {
+    return null
+  }
 }
 
 // ------------------------------------------------------------------ product photo -> 3D model

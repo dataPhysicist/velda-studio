@@ -49,6 +49,7 @@ export type MessageMeta = {
     quality: 'standard' | 'best'
     model: string
     resolution: string
+    ratio?: string
     usd: number
     seconds: number
     predict?: number

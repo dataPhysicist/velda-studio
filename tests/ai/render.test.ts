@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeCamera, RENDER_RUNS, renderNote, renderPrompt } from '../../src/ai/render'
+import { describeCamera, nearestRatio, RENDER_RUNS, renderNote, renderPrompt } from '../../src/ai/render'
 import { sideWord } from '../../src/ai/summary'
 import type { Theme } from '../../src/lib/theme'
 import { applyOps } from '../../src/model/ops'
@@ -81,5 +81,12 @@ describe('render prompt', () => {
     expect(RENDER_RUNS.best.usd).toBeGreaterThan(RENDER_RUNS.standard.usd)
     expect(renderNote('standard', 41.4)).toBe('Standard, 1K · about $0.07 · 41 s')
     expect(renderNote('best', null)).toBe('Best quality, 2K · about $0.13')
+  })
+
+  it('asks for the shape of the view outright, nearest of the ratios the model takes', () => {
+    expect(nearestRatio(1.5)).toEqual({ ratio: '3:2', w: 1536, h: 1024 })
+    expect(nearestRatio(0.95)).toEqual({ ratio: '1:1', w: 1536, h: 1536 })
+    expect(nearestRatio(1.78).ratio).toBe('16:9')
+    expect(nearestRatio(0.66)).toEqual({ ratio: '2:3', w: 1024, h: 1536 })
   })
 })

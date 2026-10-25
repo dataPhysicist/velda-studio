@@ -36,7 +36,8 @@ export async function snapshotView(w = 1536, h = 1024, pose?: { position: number
   cam.fov = main.fov
   cam.near = main.near
   cam.far = main.far
-  cam.aspect = width / height
+  // The snapshot's own shape (the caller picks one near the screen's), so nothing is stretched.
+  cam.aspect = pose ? width / height : w / h
   if (pose) {
     cam.position.fromArray(pose.position)
     cam.quaternion.fromArray(pose.quaternion)

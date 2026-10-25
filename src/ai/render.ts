@@ -24,6 +24,32 @@ export const RENDER_RUNS: Record<Quality, { model: string; resolution: string; u
 }
 
 const ft = (v: number) => formatFeetInches(v).replace(/^0'-/, '')
+
+/** Aspect ratios the render models take. */
+export const RATIOS = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'] as const
+
+/**
+ * The supported ratio nearest a view or photo, and a snapshot size in it (long side 1536). Asking for
+ * the ratio outright keeps the render framed like the view: with "match_input_image" the model went
+ * by a portrait reference picture and reframed a landscape view (Phase 6 run).
+ */
+export function nearestRatio(aspect: number): { ratio: (typeof RATIOS)[number]; w: number; h: number } {
+  let best: (typeof RATIOS)[number] = '3:2'
+  let miss = Infinity
+  for (const r of RATIOS) {
+    const [a, b] = r.split(':').map(Number)
+    const d = Math.abs(Math.log(a / b) - Math.log(aspect))
+    if (d < miss) {
+      miss = d
+      best = r
+    }
+  }
+  const [a, b] = best.split(':').map(Number)
+  const long = 1536
+  const w = a >= b ? long : Math.round((long * a) / b / 8) * 8
+  const h = a >= b ? Math.round((long * b) / a / 8) * 8 : long
+  return { ratio: best, w, h }
+}
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 
 export type Pose = { position: number[]; direction: number[]; fov: number; aspect: number }

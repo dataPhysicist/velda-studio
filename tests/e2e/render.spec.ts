@@ -57,6 +57,7 @@ test('render: the app writes the prompt, the render is labeled, and best quality
   const run = (await page.evaluate(() => (window as any).__runs[0])) as { model: string; input: any }
   expect(run.model).toBe('google/nano-banana-2')
   expect(run.input.resolution).toBe('1K')
+  expect(run.input.aspect_ratio).toMatch(/^\d+:\d+$/) // the view's own shape, not "match_input_image"
   expect(run.input.image_input[0]).toMatch(/^https:\/\/storage\.example\/velda-studio\/renders\/r\w+-view\.png$/)
   const p = run.input.prompt as string
   expect(p).toContain('Image 1 is a simple 3D model view')
