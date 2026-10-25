@@ -196,7 +196,17 @@ async function renderRealistic(a: Op) {
     const u = /^https?:/.test(p) ? p : await link(p).catch(() => '')
     if (u && !refs.includes(u)) refs.push(u)
   }
-  const cards = room ? model.inspiration.filter((c) => c.kind !== 'board' && c.rooms.includes(room.id) && c.image) : []
+  // The room's cards that share the most colors with its theme come first: those are the ones the
+  // theme was made from.
+  const themeHex = new Set((theme?.data.palette ?? []).map((p) => p.hex.toLowerCase()))
+  const shared = (c: (typeof model.inspiration)[number]) => new Set([...c.tags.palette, ...(c.sampled ?? [])].map((p) => p.hex.toLowerCase()).filter((h) => themeHex.has(h))).size
+  const cards = room
+    ? model.inspiration
+        .filter((c) => c.kind !== 'board' && c.rooms.includes(room.id) && c.image)
+        .map((c, i) => ({ c, i, n: shared(c) }))
+        .sort((a, b) => b.n - a.n || a.i - b.i)
+        .map((x) => x.c)
+    : []
   for (const c of cards.slice(0, 4)) await add(c.image)
   for (const im of (theme?.data.images ?? []).slice(0, 2)) await add(im.url ?? im.path)
   for (const r of Array.isArray(a.refs) ? a.refs : []) await add(String(r))

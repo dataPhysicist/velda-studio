@@ -150,6 +150,17 @@ test('inspiration: pictures and a Pinterest board for the primary bath become ta
   expect(themeAsk).toContain(`N8: Make a theme for the Primary Bathroom from these inspiration cards: ${pics[0].id}`)
   expect(themeAsk).toMatch(/INSPIRATION \(\d+ of 13 cards\):/)
   expect(s.model.themes[s.model.rooms.find((r: any) => r.id === bath).theme].name).toBe('Primary bath spa')
+  // The as-built is a record, so the theme went to a new scheme whose chat starts with the request,
+  // shown in plain words (no card ids); the as-built chat says where it went.
+  const asBuiltId = (await page.evaluate(() => (window as any).__studio.store.getState().schemes.find((x: any) => x.role === 'asbuilt')?.id)) as string
+  if (asBuiltId) {
+    expect(s.schemeId).not.toBe(asBuiltId)
+    expect(s.schemes.find((x: any) => x.id === s.schemeId).name).toBe('Primary bath spa theme')
+    expect(s.messages[0]).toMatchObject({ role: 'user', body: `Make a theme for the Primary Bathroom from these 3 inspiration cards: ${pics.map((c: any) => `"${c.title}"`).join(', ')}.` })
+    expect(s.messages[1].body).toMatch(/in a new scheme, "Primary bath spa theme", so your as-built record stays as it is\.$/)
+    const before = await page.evaluate((id) => (window as any).__studio.repo.messages(id), asBuiltId)
+    expect(before.at(-1).body).toBe('I made that in a new scheme, "Primary bath spa theme", so the as-built record stays as it is.')
+  }
 
   // 4. The mood board shows the theme and the pictures, and prints alone.
   await page.getByRole('button', { name: 'Mood board' }).click()

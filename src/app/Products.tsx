@@ -2,7 +2,7 @@
 // link, and Place, which puts it against the wall the fit worked out (or the longest free wall).
 import { showerFits } from '../library/fit'
 import type { ItemKind } from '../model/types'
-import { formatFeetInches } from '../model/units'
+import { formatFeetInches, productName } from '../model/units'
 import type { MessageMeta } from '../repo'
 import { handEdit } from './editor'
 import { useStudio } from './store'
@@ -50,7 +50,7 @@ function place(p: Product) {
   // A shower goes where the fit found room for that type; anything else against the longest free wall.
   const fit = kind === 'shower' ? showerFits(model, room).fits.find((f) => f.id === p.type) : null
   return handEdit(
-    [{ op: 'place', item: { kind, label: p.title.slice(0, 60), w: p.w, d: p.d, props: { url: p.url, ...(p.image ? { image: p.image } : {}), ...(p.price ? { price: p.price } : {}) } }, room: room.id, against: fit?.wall ?? 'longest', align: fit ? 'start' : 'center' }],
-    `Placed ${p.title.slice(0, 40)}`,
+    [{ op: 'place', item: { kind, label: productName(p.title), w: p.w, d: p.d, props: { url: p.url, ...(p.image ? { image: p.image } : {}), ...(p.price ? { price: p.price } : {}) } }, room: room.id, against: fit?.wall ?? 'longest', align: fit ? 'start' : 'center' }],
+    `Placed ${productName(p.title)}`,
   )
 }

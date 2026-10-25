@@ -1,6 +1,7 @@
 // The page's side of inspiration (06 section 6): adding cards from a drop or a link (one version),
 // showing their pictures, filing them under rooms, and asking Velda for a theme from a selection.
 import { type Source, ingest } from '../inspiration/ingest'
+import { classifyLink } from '../inspiration/pinterest'
 import type { Inspiration } from '../model/types'
 import type { Attachment } from '../repo'
 import { handEdit } from './editor'
@@ -73,8 +74,9 @@ export async function addInspiration(sources: Source[], roomIds: string[], shown
 }
 
 function describe(sources: Source[]) {
-  const files = sources.filter((s) => 'file' in s || 'path' in s).length
-  const links = sources.filter((s) => 'url' in s).length
+  const picture = (s: Source) => 'file' in s || 'path' in s || ('url' in s && classifyLink(s.url).kind === 'image')
+  const files = sources.filter(picture).length
+  const links = sources.length - files
   return [files && plural(files, 'picture'), links && plural(links, 'link')].filter(Boolean).join(' and ')
 }
 
@@ -115,9 +117,12 @@ export function fileUnder(id: string, roomId: string) {
 /** Ask Velda for a theme from the picked cards, applied to the room (one version, through the chat). */
 export function themeFrom(cards: Inspiration[], roomId: string | null) {
   const room = roomId ? get().model?.rooms.find((r) => r.id === roomId) : null
+  const where = room ? `the ${room.name}` : 'the house'
   const list = cards.map((c) => `${c.id} "${c.title ?? c.kind}"`).join(', ')
+  const titles = cards.map((c) => `"${c.title ?? c.kind}"`).join(', ')
   if (room) useStudio.setState({ roomId: room.id })
-  return send(
-    `Make a theme for ${room ? `the ${room.name}` : 'the house'} from these inspiration cards: ${list}. Take its colors from their palettes (give each a role), name the materials, and apply it to ${room ? `the ${room.name}` : 'the house'}.`,
-  )
+  // N8 sees the titles; Velda also gets the card ids so she can find them in the model.
+  return send(`Make a theme for ${where} from ${cards.length === 1 ? 'this inspiration card' : `these ${cards.length} inspiration cards`}: ${titles}.`, [], {
+    forVelda: `Make a theme for ${where} from these inspiration cards: ${list}. Take its colors from their palettes (give each a role), name the materials, and apply it to ${where}.`,
+  })
 }

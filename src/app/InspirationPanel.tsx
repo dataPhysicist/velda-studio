@@ -176,7 +176,7 @@ function Card({ c, model, picked, onPick }: { c: Inspiration; model: Model; pick
       title="Drag onto a room in the plan to file it there"
     >
       <label className="insp-pick">
-        <input type="checkbox" checked={picked} onChange={(e) => onPick(e.target.checked)} />
+        <input type="checkbox" aria-label={`Pick ${c.title ?? "this card"}`} checked={picked} onChange={(e) => onPick(e.target.checked)} />
         <span className="sr-only">Pick {c.title}</span>
       </label>
       {src ? <img src={src} alt={c.title ?? ''} loading="lazy" /> : <div className="insp-noimg" aria-hidden="true" />}

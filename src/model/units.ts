@@ -25,3 +25,17 @@ export function formatFeetInches(inches: number): string {
 
 /** Area in square feet, rounded: 453 sf. */
 export const sqft = (sqIn: number) => Math.round(sqIn / 144)
+
+/** Shorten text to at most n characters at a word break, without a dangling comma or dash. */
+export function clipWords(s: string, n: number): string {
+  const t = s.trim().replace(/\s+/g, ' ')
+  if (t.length <= n) return t
+  const cut = t.slice(0, n + 1)
+  const at = cut.lastIndexOf(' ')
+  return (at > n / 2 ? cut.slice(0, at) : t.slice(0, n)).replace(/[\s,;:(\-]+$/, '')
+}
+
+/** A product's name for a label: the part before a comma, dash or bar, at most 48 characters. */
+export function productName(title: string): string {
+  return clipWords(title.split(/,\s|\s[-–|]\s|\s\(/)[0], 48)
+}

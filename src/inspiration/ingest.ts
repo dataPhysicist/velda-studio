@@ -84,16 +84,22 @@ export async function ingest(sources: Source[], rooms: string[], deps: IngestDep
   }
   const pictures = entries.filter((e) => e.kind !== 'board')
   if (pictures.length && deps.sdk) {
-    for (let i = 0; i < pictures.length; i += 8) {
-      const batch = pictures.slice(i, i + 8)
-      deps.progress(`Velda is looking at ${pictures.length === 1 ? 'the picture' : `pictures ${i + 1} to ${i + batch.length} of ${pictures.length}`}`)
+    // Batches of at most 8, as even as possible, three at a time: a 9-pin board is two calls of 5
+    // and 4 that run together, not 8 and then 1.
+    const count = Math.ceil(pictures.length / 8)
+    const size = Math.ceil(pictures.length / count)
+    const batches: { from: number; items: Inspiration[] }[] = []
+    for (let i = 0; i < pictures.length; i += size) batches.push({ from: i, items: pictures.slice(i, i + size) })
+    deps.progress(`Velda is looking at ${pictures.length === 1 ? 'the picture' : `${pictures.length} pictures`}`)
+    const tag = async ({ from, items }: { from: number; items: Inspiration[] }) => {
       try {
-        const raw = await deps.sdk.ask(tagPrompt(batch), DEEP_MODEL, 240)
-        applyTags(batch, firstJson(raw))
+        const raw = await deps.sdk!.ask(tagPrompt(items), DEEP_MODEL, 240)
+        applyTags(items, firstJson(raw))
       } catch (err) {
-        said.push(`Velda could not tag ${batch.length === 1 ? 'that picture' : 'some pictures'} (${(err as Error).message}); they are saved untagged.`)
+        said.push(`Velda could not tag ${items.length === 1 ? 'that picture' : `pictures ${from + 1} to ${from + items.length}`} (${(err as Error).message}); they are saved untagged.`)
       }
     }
+    for (let i = 0; i < batches.length; i += 3) await Promise.all(batches.slice(i, i + 3).map(tag))
     // A board takes the style and colors its pins share.
     for (const b of entries.filter((e) => e.kind === 'board')) b.tags = boardTags(entries.filter((e) => e.parent === b.id))
   }
@@ -130,6 +136,9 @@ Return ONLY one JSON object:
 No other text.`
 }
 
+/** How far (RGB distance) a color Velda names may be from a measured one and still snap to it. */
+export const SNAP = 40
+
 /** Merge Velda's answer onto the cards; palette colors must be ones that were measured. */
 export function applyTags(batch: Inspiration[], ans: any) {
   const items: any[] = Array.isArray(ans?.items) ? ans.items : []
@@ -144,17 +153,29 @@ export function applyTags(batch: Inspiration[], ans: any) {
     const e = batch[(Number(it?.i) || 0) - 1]
     if (!e) continue
     const words = (v: any) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()).map((x: string) => x.trim()).slice(0, 8) : [])
-    const close = (hex: string) => {
-      const c = [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16))
-      return (e.sampled ?? []).some((s) => {
-        const d = [1, 3, 5].map((k) => parseInt(s.hex.slice(k, k + 2), 16))
-        return Math.hypot(c[0] - d[0], c[1] - d[1], c[2] - d[2]) < 10
-      })
+    // Each color Velda names is snapped to the nearest measured color (it keeps its name); a color
+    // nothing measured comes near is dropped. With nothing left, the measured colors stand unnamed.
+    const rgb = (hex: string) => [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16))
+    const nearest = (hex: string) => {
+      const c = rgb(hex)
+      let best: { hex: string; d: number } | null = null
+      for (const s of e.sampled ?? []) {
+        const v = rgb(s.hex)
+        const d = Math.hypot(c[0] - v[0], c[1] - v[1], c[2] - v[2])
+        if (d < SNAP && (!best || d < best.d)) best = { hex: s.hex, d }
+      }
+      return best?.hex ?? null
     }
-    const palette = (Array.isArray(it.palette) ? it.palette : [])
-      .filter((p: any) => /^#[0-9a-f]{6}$/i.test(p?.hex ?? ''))
-      .map((p: any) => ({ hex: String(p.hex).toLowerCase(), ...(p.name ? { name: String(p.name) } : {}) }))
-      .filter((p: { hex: string }) => close(p.hex)) // sampled, not guessed
+    const seen = new Set<string>()
+    let palette: { hex: string; name?: string }[] = []
+    for (const p of Array.isArray(it.palette) ? it.palette : []) {
+      if (!/^#[0-9a-f]{6}$/i.test(p?.hex ?? '')) continue
+      const hex = nearest(String(p.hex).toLowerCase()) // sampled, not guessed
+      if (!hex || seen.has(hex)) continue
+      seen.add(hex)
+      palette.push({ hex, ...(p.name ? { name: String(p.name) } : {}) })
+    }
+    if (!palette.length) palette = (e.sampled ?? []).slice(0, 5).map((s) => ({ hex: s.hex }))
     e.tags = { style: words(it.style), materials: words(it.materials), fixtures: words(it.fixtures), palette, ...(it.notes ? { notes: String(it.notes) } : {}) }
     if (typeof it.title === 'string' && it.title.trim()) e.title = it.title.trim().slice(0, 80)
     if (e.kind === 'url' && typeof it.image === 'string' && /^https:\/\//.test(it.image)) e.image = it.image

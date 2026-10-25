@@ -5,6 +5,7 @@ import { type Op, applyOps, mayCarryLoad } from '../model/ops'
 import { pointInPolygon, poleOfInaccessibility, wallLength } from '../model/geom'
 import type { Model, Room, Wall } from '../model/types'
 import { leftOf, pointOn, roomAt, thick } from '../plan2d/geometry'
+import { clipWords } from '../model/units'
 import { type SelKind, type Tool, commitVersion, isAsBuilt, newSchemeFromCurrent, nextVersionLabel, stepVersion, uniqueSchemeName, useStudio } from './store'
 
 export type Choice = { label: string; run: () => void; primary?: boolean }
@@ -69,7 +70,7 @@ export async function handEdit(ops: Op[], summary: string, opts: { confirmed?: b
               primary: true,
               run: () => {
                 useEditor.setState({ confirm: null, busy: true })
-                void newSchemeFromCurrent(uniqueSchemeName('Option 1'))
+                void newSchemeFromCurrent(uniqueSchemeName(clipWords(summary, 48) || 'Option 1'))
                   .then(() => handEdit(ops, summary, { ...opts, asBuiltOk: true }))
                   .then(resolve, () => resolve(none))
                   .finally(() => useEditor.setState({ busy: false }))

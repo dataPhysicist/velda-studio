@@ -44,11 +44,12 @@ describe('inspiration ingest', () => {
     expect(pins).toHaveLength(10) // 9 from the board (one picture was pinned twice) and the single pin
     expect(pins.filter((p) => p.parent === board.id)).toHaveLength(9)
     expect(r.entries.every((e) => e.rooms[0] === 'r1')).toBe(true)
-    // Ten pictures: two Velda calls of at most eight, each with the sandbox code for its pictures.
+    // Ten pictures: two Velda calls of five that run together, each with the sandbox code for its pictures.
     expect(asked).toHaveLength(2)
+    expect(asked.map((p) => (p.match(/^\d+\. /gm) ?? []).length)).toEqual([5, 5])
     expect(asked[0]).toContain('const quantize = ')
     expect(asked[0]).toContain('https://i.pinimg.com/236x/')
-    expect(progress.some((t) => /pictures 1 to 8 of 10/.test(t))).toBe(true)
+    expect(progress).toContain('Velda is looking at 10 pictures')
     // Tags land; the made-up blue is dropped because nothing measured it.
     expect(pins[0].tags.palette).toEqual([{ hex: '#f2f3f3', name: 'marble white' }])
     expect(pins[0].sampled).toEqual([{ hex: '#f2f3f3', share: 0.5 }, { hex: '#dcdedf', share: 0.4 }])
@@ -89,7 +90,17 @@ describe('inspiration ingest', () => {
     expect(p).toContain('measured colors #ffffff 60%')
     expect(p).not.toContain('execute_code exactly') // nothing to measure remotely
     applyTags([e], { items: [{ i: 1, palette: [{ hex: '#fefefe', name: 'white' }, { hex: '#000000' }], style: ['bright'] }] })
-    expect(e.tags.palette).toEqual([{ hex: '#fefefe', name: 'white' }]) // within a hair of a measured color
+    expect(e.tags.palette).toEqual([{ hex: '#ffffff', name: 'white' }]) // snapped to the measured color, keeping Velda's name
+  })
+
+  it('snaps the colors Velda names to the nearest measured one, and falls back to the measured colors', () => {
+    const card = (): Inspiration => ({ id: 'b', kind: 'image', image: 'x.jpg', sampled: [{ hex: '#cdd1d5', share: 0.3 }, { hex: '#7f7167', share: 0.2 }, { hex: '#56453d', share: 0.1 }], tags: { style: [], palette: [], materials: [], fixtures: [] }, rooms: [], addedBy: 'user', createdAt: '' })
+    const a = card()
+    applyTags([a], { items: [{ i: 1, palette: [{ hex: '#c4c8cc', name: 'cool white' }, { hex: '#c9cdd0', name: 'same white again' }, { hex: '#8a7a6c', name: 'taupe' }, { hex: '#1f6fd0', name: 'a blue nobody measured' }] }] })
+    expect(a.tags.palette).toEqual([{ hex: '#cdd1d5', name: 'cool white' }, { hex: '#7f7167', name: 'taupe' }])
+    const b = card()
+    applyTags([b], { items: [{ i: 1, palette: [{ hex: '#1f6fd0', name: 'blue' }] }] })
+    expect(b.tags.palette).toEqual([{ hex: '#cdd1d5' }, { hex: '#7f7167' }, { hex: '#56453d' }])
   })
 
   it('keeps the words a board\'s pins share most', () => {

@@ -29,7 +29,8 @@ const r8 = (v: number) => Math.round(v * 8) / 8
 /** Feet and inches, but 6" rather than 0'-6" under a foot. */
 const fmt = (v: number) => formatFeetInches(v).replace(/^(-?)0'-/, '$1')
 const nameOf = (it: Item) => it.label || it.kind.replace('_', ' ')
-const lc = (s: string) => s.charAt(0).toLowerCase() + s.slice(1)
+/** "main sink" from "Main sink", but a product name keeps its capitals ("Royal Bath ERASTONE"). */
+const lc = (s: string) => (/[A-Z]/.test(s.slice(1)) ? s : s.charAt(0).toLowerCase() + s.slice(1))
 /** "the Primary Bath", but "Room 3" (a generic name reads better without it). */
 const theRoom = (name: string) => (/^(room|space|area)\b/i.test(name) ? name : `the ${name}`)
 const ROOM_WET = /bath|powder|wc|shower|laundry/i

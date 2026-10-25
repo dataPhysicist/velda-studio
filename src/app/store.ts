@@ -387,12 +387,14 @@ async function asBuiltModel(): Promise<Model | null> {
   return model
 }
 
-export async function send(text: string, attachments: Attachment[] = []) {
+/** Send a chat message. `forVelda` replaces the text in Velda's prompt only (ids she needs, words N8 does not). */
+export async function send(text: string, attachments: Attachment[] = [], opts: { forVelda?: string } = {}) {
   const { sdk, model, thinking } = get()
-  const body = text.trim()
+  const shown = text.trim()
+  const body = opts.forVelda?.trim() || shown
   if ((!body && !attachments.length) || thinking || !model) return
   const history = get().messages
-  await addMessage({ role: 'user', body: body || '(photo)', attachments })
+  await addMessage({ role: 'user', body: shown || '(photo)', attachments })
   if (!sdk) {
     await addMessage({ role: 'assistant', body: 'Velda needs Toolbelt to answer. Open this page inside Toolbelt.' })
     return
@@ -458,8 +460,12 @@ export async function send(text: string, attachments: Attachment[] = []) {
       if (products.length) modelOps.push({ op: 'add_inspiration', entries: products })
       const res = applyOps(get().model!, modelOps, { author: 'ai', versionLabel: branching ? `v2 ${summary}` : nextVersionLabel(summary), focusLevel: room?.level ?? get().levelId })
       if (branching && res.applied) {
-        await newSchemeFromCurrent(uniqueSchemeName(ans.summary || 'Option 1'))
-        note += `\n\nI made this change in a new scheme, "${get().schemes.find((x) => x.id === get().schemeId)?.name}", so your as-built record stays as it is.`
+        // The as-built chat says where the change went; the new scheme's chat starts with the request.
+        const name = uniqueSchemeName(ans.summary || 'Option 1')
+        await addMessage({ role: 'assistant', body: `I made that in a new scheme, "${name}", so the as-built record stays as it is.` })
+        await newSchemeFromCurrent(name)
+        await addMessage({ role: 'user', body: shown || '(photo)', attachments })
+        if (!/new scheme/i.test(reply)) note += `\n\nI made this change in a new scheme, "${name}", so your as-built record stays as it is.`
       }
       if (res.applied) {
         const v = await commitVersion(res.model, summary, 'chat', { author: 'ai', ops: [...modelOps, ...research] })

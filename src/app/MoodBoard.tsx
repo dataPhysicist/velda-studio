@@ -61,6 +61,17 @@ export function MoodBoard({ roomId, onClose }: { roomId: string; onClose: () => 
                 </li>
               )
             })}
+            {/* Colors beyond the first for a role (a second accent, the veining): shown too. */}
+            {(theme.data.palette ?? [])
+              .filter((p) => { const r = (p.role ?? '').toLowerCase(); return !(ROLES as readonly string[]).includes(r) || p !== paletteFor(theme, r as any) })
+              .map((p) => (
+                <li key={`${p.role}-${p.hex}`}>
+                  <span className="mb-chip" style={{ background: p.hex }} />
+                  <strong>{p.role ?? 'color'}</strong>
+                  <span>{p.name}</span>
+                  <code>{p.hex}</code>
+                </li>
+              ))}
           </ul>
           {!!theme.data.materials?.length && (
             <ul className="mb-materials">
