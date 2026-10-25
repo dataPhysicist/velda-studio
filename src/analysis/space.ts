@@ -93,7 +93,8 @@ export function ray(o: Vec, d: Vec, segs: Seg[], max = 1200): { dist: number; se
       hit = s
     }
   }
-  return { dist: best, seg: hit }
+  // Thousandths of an inch: a toilet nudged 12 + 3 x 1 in is 15 in, not 14.99999.
+  return { dist: Math.round(best * 1000) / 1000, seg: hit }
 }
 
 /** The smallest of several parallel rays from points along an edge (clear space in front of it). */

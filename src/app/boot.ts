@@ -37,6 +37,8 @@ export async function boot() {
     importFlow: () => import('./importFlow'),
     // Hand edits (the plan editor), for test setup and the console.
     editor: () => import('./editor'),
+    // Clear-space geometry (what the checker measures with), for test setup.
+    space: () => import('../analysis/space'),
   }
   try {
     await repo.init()

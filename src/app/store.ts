@@ -1,5 +1,6 @@
 // App state and actions: schemes, versions, conversation, focus.
 import { create } from 'zustand'
+import { type Issue, runChecks } from '../analysis/checks'
 import { DEEP_MODEL, askVelda, buildPrompt, pickModel } from '../lib/agent'
 import type { Theme } from '../lib/theme'
 import { polygonBounds } from '../model/geom'
@@ -45,6 +46,14 @@ type State = {
   comments: Comment[]
   /** How the 3D view shows the house (06 section 3). */
   look: Look
+  /** The checker's issues for the model on screen (07 section 5), worked out on every version. */
+  checks: Issue[]
+  /** Issue ids set aside in this scheme: dismissed (a note or should-fix) or acknowledged (structure). */
+  setAside: { dismissed: string[]; acked: string[] }
+  /** Which tab the right-hand panel shows. */
+  ctxTab: 'selection' | 'checks'
+  /** A request for the plan to frame some points on a level (a check clicked in the panel). */
+  frameReq: { level: string; pts: [number, number][]; key: number } | null
 }
 
 export type Look = {
@@ -83,6 +92,10 @@ export const useStudio = create<State>(() => ({
   tool: 'select',
   comments: [],
   look: { walls: 'cutaway', levels: 'auto', light: 'studio' },
+  checks: [],
+  setAside: { dismissed: [], acked: [] },
+  ctxTab: 'selection',
+  frameReq: null,
 }))
 
 const set = useStudio.setState
@@ -95,7 +108,31 @@ const clone = <T,>(v: T): T => structuredClone(v)
 function render(model: Model) {
   showScene(compileScene(model))
   set((s) => ({ model, sceneKey: s.sceneKey + 1 }))
+  void refreshChecks()
   void import('./actions').then((m) => m.loadAssets(model)).catch(() => {})
+}
+
+/** Run the checker on the model on screen (against the as-built head, for moves like a toilet's drain). */
+export async function refreshChecks() {
+  const model = get().model
+  if (!model) return
+  const reference = await asBuiltModel().catch(() => null)
+  if (get().model !== model) return // a newer version is already on screen
+  set({ checks: runChecks(model, { asBuilt: reference }) })
+}
+
+/** Ask the plan to frame these points (switching to the plan and that level). */
+export function frameOn(level: string, pts: [number, number][]) {
+  if (!pts.length) return
+  set((s) => ({ view: 'plan', levelId: level, frameReq: { level, pts, key: (s.frameReq?.key ?? 0) + 1 } }))
+}
+
+/** Set an issue aside in this scheme (kept in the database so it stays set aside). */
+export async function setIssueAside(id: string, how: 'dismissed' | 'acked', on = true) {
+  const { repo, schemeId, setAside } = get()
+  const next = { ...setAside, [how]: on ? [...new Set([...setAside[how], id])] : setAside[how].filter((x) => x !== id) }
+  set({ setAside: next })
+  if (repo && schemeId) await repo.setSetting(`checks_aside:${schemeId}`, JSON.stringify(next)).catch(() => {})
 }
 
 /** Recompile the current model (after generated 3D models finish loading). */
@@ -174,6 +211,8 @@ export async function openScheme(id: string) {
     const stored = headId ? await repo.model(headId) : null
     const messages = await repo.messages(scheme.id)
     const comments = await repo.comments(scheme.id).catch(() => [])
+    const aside = await repo.setting(`checks_aside:${scheme.id}`).catch(() => null)
+    set({ setAside: (() => { try { return { dismissed: [], acked: [], ...JSON.parse(aside ?? '{}') } } catch { return { dismissed: [], acked: [] } } })() })
     await repo.setSetting('last_scheme', scheme.id)
     set({ schemes, schemeId: scheme.id, versions, headId: headId ?? null, messages, comments, selection: [], status: null })
     let model = stored && !isV1(stored) ? (stored as Model) : null

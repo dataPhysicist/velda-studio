@@ -94,6 +94,12 @@ function PlanView({ model }: { model: Model }) {
     const mg = 36
     return fitTo({ x0: Math.min(...xs) - mg, y0: Math.min(...ys) - mg, x1: Math.max(...xs) + mg, y1: Math.max(...ys) + mg })
   }
+  // A check clicked in the Checks panel (or anything else) asks the plan to frame some points.
+  const frameReq = useStudio((s) => s.frameReq)
+  // biome-ignore lint: frame once per request
+  useEffect(() => {
+    if (frameReq && frameReq.level === level) setView(frame(frameReq.pts))
+  }, [frameReq?.key, level])
   const toPlan = useCallback((client: { clientX: number; clientY: number }): Vec => {
     const el = svg.current
     const ctm = el?.getScreenCTM()

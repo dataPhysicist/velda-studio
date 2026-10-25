@@ -8,6 +8,7 @@ import type { Op } from '../model/ops'
 import { type Badge, type Comment, type Item, type Model, type Opening, type OpeningKind, type Prov, type Room, type Wall, badgeOf, weakestBadge } from '../model/types'
 import { formatFeetInches as fmt } from '../model/units'
 import { roomAt, roomClearDims, leftOf, pointOn, thick } from '../plan2d/geometry'
+import { ChecksPanel } from './Checks'
 import { clearSelection, handEdit, removeSelected, select, setTool, useEditor } from './editor'
 import { useStudio } from './store'
 
@@ -121,6 +122,12 @@ export function ContextPanel({ onHide }: { onHide: () => void }) {
   const roomId = useStudio((s) => s.roomId)
   const tool = useStudio((s) => s.tool)
   const comments = useStudio((s) => s.comments)
+  const tab = useStudio((s) => s.ctxTab)
+  const checks = useStudio((s) => s.checks)
+  const dismissed = useStudio((s) => s.setAside.dismissed)
+  const open = checks.filter((i) => !dismissed.includes(i.id))
+  const shown = open.length
+  const worst = open.some((i) => i.severity === 'blocks') ? 'blocks' : open.some((i) => i.severity === 'fix') ? 'fix' : 'note'
   let body: React.ReactNode = null
   if (!model) body = null
   else if (selection.length > 1) body = <Many model={model} />
@@ -162,14 +169,27 @@ export function ContextPanel({ onHide }: { onHide: () => void }) {
   return (
     <aside className="ctx" aria-label="Context">
       <header className="ctx-head">
-        <h2>Selection</h2>
+        <div className="ctx-tabs" role="tablist" aria-label="Panel">
+          <button type="button" role="tab" aria-selected={tab === 'selection'} onClick={() => useStudio.setState({ ctxTab: 'selection' })}>
+            Selection
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'checks'} onClick={() => useStudio.setState({ ctxTab: 'checks' })}>
+            Checks{shown ? <span className={`ctx-count${worst === 'blocks' ? ' is-code' : ''}`}>{shown}</span> : null}
+          </button>
+        </div>
         <button type="button" className="link" onClick={onHide}>
           Hide
         </button>
       </header>
-      <div className="ctx-body">
-        {tool === 'wall' && <NewWallThickness />}
-        {body}
+      <div className="ctx-body" role="tabpanel">
+        {tab === 'checks' ? (
+          <ChecksPanel />
+        ) : (
+          <>
+            {tool === 'wall' && <NewWallThickness />}
+            {body}
+          </>
+        )}
       </div>
     </aside>
   )

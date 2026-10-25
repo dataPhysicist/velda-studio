@@ -421,3 +421,31 @@ input.fld-num.is-bad { border-color: var(--warn); }
 .choice-thumb .t-wall { fill: var(--graphite); }
 .choice-thumb .t-open { stroke: var(--vellum); }
 .choice-thumb .t-item { fill: var(--paper); stroke: var(--verdigris); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+
+/* Right panel tabs (06 section 1) and the Checks tab (06 section 5) */
+.ctx-tabs { display: flex; gap: 18px; }
+.ctx-tabs button { border: 0; background: none; padding: 0 0 4px; font: 400 22px/1.1 var(--serif); color: var(--slate); border-bottom: 2px solid transparent; }
+.ctx-tabs button[aria-selected='true'] { color: var(--graphite); border-bottom-color: var(--graphite); }
+.ctx-tabs button:hover { color: var(--graphite); }
+.ctx-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; margin-left: 6px; padding: 0 5px; border-radius: 10px; font: 500 12px/1 var(--sans); vertical-align: 3px; background: var(--paper); border: 1px solid var(--line); color: var(--slate); }
+.ctx-count.is-code { background: var(--warn); border-color: var(--warn); color: var(--paper); }
+.checks { display: grid; gap: 16px; }
+.checks-sum { margin: 0; color: var(--slate); font-size: 14px; }
+.checks-room { font: 500 13px/1.3 var(--sans); text-transform: uppercase; letter-spacing: 0.04em; color: var(--slate); margin: 0 0 6px; }
+.checks ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.issue { background: var(--paper); border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+.issue.sev-blocks { border-left-color: var(--warn); }
+.issue.sev-fix { border-left-color: #b7832f; }
+.issue.sev-note, .issue.is-locked { border-left-color: var(--slate); }
+.issue.is-acked { opacity: 0.8; }
+.issue-main { display: grid; gap: 3px; width: 100%; text-align: left; border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.issue-main:hover .issue-msg { text-decoration: underline; text-decoration-color: var(--line); }
+.issue-sev { font-size: 12px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
+.sev-blocks .issue-sev { color: var(--warn); }
+.sev-fix .issue-sev { color: #8a6120; }
+.sev-note .issue-sev, .is-locked .issue-sev { color: var(--slate); }
+.issue-msg { font-size: 14px; line-height: 1.4; }
+.issue-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 8px; }
+.issue-actions:empty { display: none; }
+.btn.small { padding: 4px 10px; font-size: 13px; }
+.is-dismissed .issue { opacity: 0.7; }

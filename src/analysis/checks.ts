@@ -48,6 +48,7 @@ export function runChecks(m: Model, opts: CheckOptions = {}): Issue[] {
     return s
   }
   const push = (i: Omit<Issue, 'id'>) => out.push({ ...i, id: `${i.rule}:${i.where.ids.join(',')}` })
+  const itemsById = new Map(m.items.map((x) => [x.id, x]))
   const roomName = (level: string, p: Vec) => roomOf(m, level, p)?.name
 
   for (const it of m.items) {
@@ -59,7 +60,7 @@ export function runChecks(m: Model, opts: CheckOptions = {}): Issue[] {
     const where = { level: it.level, room: room?.id, ids: [it.id] }
     const { c, f, s } = frameOf(it)
     const frontPts = (n = 3): Vec[] => Array.from({ length: n }, (_, i) => add(add(c, mul(f, it.d / 2 + 0.01)), mul(s, (it.w / 2 - 1) * (n === 1 ? 0 : (2 * i) / (n - 1) - 1))))
-    if (it.kind === 'toilet') checkToilet(it, others, where, push)
+    if (it.kind === 'toilet') checkToilet(it, others, where, push, itemsById)
     if (it.kind === 'shower') {
       const lo = Math.min(it.w, it.d)
       if (lo < S.bath.showerMinSide.code || it.w * it.d < S.bath.showerMinArea.code)
@@ -164,28 +165,32 @@ type Push = (i: Omit<Issue, 'id'>) => void
 
 // ------------------------------------------------------------------ bathrooms
 
-function checkToilet(it: Item, others: Seg[], where: Issue['where'], push: Push) {
+function checkToilet(it: Item, others: Seg[], where: Issue['where'], push: Push, itemsById: Map<string, Item>) {
   const { c, f, s } = frameOf(it)
   // Side clearance is measured from the centerline at the bowl, a little in front of the tank.
   const at = add(c, mul(f, it.d * 0.15))
-  const left = ray(at, mul(s, -1), others).dist
-  const right = ray(at, s, others).dist
+  const L = ray(at, mul(s, -1), others)
+  const R = ray(at, s, others)
+  const [left, right] = [L.dist, R.dist]
   const tight = Math.min(left, right)
   const label = lc(nameOf(it))
   if (tight < S.bath.toiletCenterToSide.nkba) {
     const code = tight < S.bath.toiletCenterToSide.code
-    // One move fixes it when there is room on the other side: slide to the code (or NKBA) distance.
+    // What is in the way, in words: the wall beside it, or the fixture.
+    const hit = (left < right ? L : R).seg
+    const what = hit?.kind === 'item' ? `the ${lc(nameOf(itemsById.get(hit.id) ?? it))}` : 'the wall beside it'
+    // One move fixes it when there is room on the other side: slide to the code (or NKBA) distance,
+    // rounded up to the next 1/8 in so the fix always clears the issue.
     const want = left + right >= 2 * S.bath.toiletCenterToSide.nkba ? S.bath.toiletCenterToSide.nkba : S.bath.toiletCenterToSide.code
-    const shift = left < right ? want - left : -(want - right)
-    const roomy = left + right >= 2 * want
+    const mag = Math.ceil((want - tight) * 8 - 1e-6) / 8
+    const shift = left < right ? mag : -mag
+    const roomy = left + right >= 2 * want + 0.25
     push({
       severity: code ? 'blocks' : 'fix',
       rule: 'toilet-side',
       where,
-      message: code
-        ? `The ${label} is ${fmt(tight)} from its center to the ${left < right ? 'left' : 'right'}; code needs 1'-3" each side.`
-        : `The ${label} is ${fmt(tight)} from its center to the side; 1'-6" each side is recommended.`,
-      ...(roomy ? { fix: [{ op: 'move', id: it.id, dx: r8(s[0] * shift), dy: r8(s[1] * shift) }], fixLabel: `Slide it ${fmt(Math.abs(shift))}` } : {}),
+      message: code ? `The ${label} is ${fmt(tight)} from its center to ${what}; code needs 1'-3" each side.` : `The ${label} is ${fmt(tight)} from its center to ${what}; 1'-6" each side is recommended.`,
+      ...(roomy ? { fix: [{ op: 'move', id: it.id, dx: s[0] * shift, dy: s[1] * shift }], fixLabel: `Slide it ${fmt(mag)}` } : {}),
     })
   }
   const front = clearAlong([add(c, mul(f, it.d / 2 + 0.01))], f, others).dist
