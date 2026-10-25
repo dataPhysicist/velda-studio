@@ -1,0 +1,130 @@
+{
+  "edition": "Florida Building Code, Residential, 8th Edition (2023), which is based on the 2021 International Residential Code. Section numbers below are IRC 2021; the FBC adopts them with Florida amendments, and the numbers here were checked against 10-design-reference, not line by line against the FBC text.",
+  "nkba": "NKBA Kitchen and Bathroom Planning Guidelines (the checker's 'fix' level).",
+  "bath": {
+    "toiletCenterToSide": {
+      "code": 15,
+      "nkba": 18,
+      "source": "IRC R307.1, Figure R307.2; NKBA bath 15"
+    },
+    "toiletFront": {
+      "code": 21,
+      "nkba": 30,
+      "source": "IRC R307.1; NKBA bath 14"
+    },
+    "lavatoryFront": {
+      "code": 21,
+      "source": "IRC R307.1"
+    },
+    "lavatoryWidthPerSink": {
+      "nkba": 30,
+      "double": 36,
+      "source": "NKBA bath 9"
+    },
+    "showerMinSide": {
+      "code": 30,
+      "nkba": 36,
+      "source": "IRC P2708.1"
+    },
+    "showerMinArea": {
+      "code": 900,
+      "source": "IRC P2708.1 (square inches)"
+    },
+    "showerFront": {
+      "code": 24,
+      "nkba": 30,
+      "source": "IRC R307.1"
+    },
+    "tubFront": {
+      "code": 21,
+      "source": "IRC R307.1"
+    }
+  },
+  "kitchen": {
+    "workAisle": {
+      "one": 42,
+      "two": 48,
+      "source": "NKBA kitchen 6"
+    },
+    "walkway": {
+      "nkba": 36,
+      "source": "NKBA kitchen 7"
+    },
+    "dishwasherStanding": {
+      "nkba": 21,
+      "source": "NKBA kitchen 19"
+    },
+    "cooktopWindowEdge": {
+      "nkba": 3,
+      "source": "NKBA kitchen 23"
+    }
+  },
+  "doors": {
+    "egressClear": {
+      "code": 32,
+      "height": 78,
+      "source": "IRC R311.2"
+    },
+    "interiorMin": {
+      "fix": 28
+    },
+    "recommended": {
+      "nkba": 32
+    }
+  },
+  "egress": {
+    "netClearSf": {
+      "code": 5.7,
+      "grade": 5.0,
+      "source": "IRC R310.2.1"
+    },
+    "minClearHeight": {
+      "code": 24,
+      "source": "IRC R310.2.1"
+    },
+    "minClearWidth": {
+      "code": 20,
+      "source": "IRC R310.2.1"
+    },
+    "maxSill": {
+      "code": 44,
+      "source": "IRC R310.2.2"
+    }
+  },
+  "stairs": {
+    "minWidth": {
+      "code": 36,
+      "source": "IRC R311.7.1"
+    },
+    "maxRiser": {
+      "code": 7.75,
+      "source": "IRC R311.7.5.1"
+    },
+    "minTread": {
+      "code": 10,
+      "source": "IRC R311.7.5.2"
+    },
+    "headroom": {
+      "code": 80,
+      "source": "IRC R311.7.2"
+    },
+    "landing": {
+      "code": 36,
+      "source": "IRC R311.7.6"
+    }
+  },
+  "halls": {
+    "minWidth": {
+      "code": 36,
+      "source": "IRC R311.6"
+    }
+  },
+  "glazing": {
+    "nearWetFloor": 60,
+    "nearDoor": 24,
+    "source": "IRC R308.4.2, R308.4.5"
+  },
+  "plumbing": {
+    "toiletMoveNote": 24
+  }
+}
