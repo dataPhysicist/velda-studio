@@ -44,6 +44,22 @@ export type MessageMeta = {
   research?: string[]
   /** Products Velda found (research results), each placeable in the room the talk was about. */
   products?: { title: string; url: string; type?: string; w?: number; d?: number; price?: string; image?: string; room?: string | null }[]
+  /** A realistic render: how it was made (quality, model, size, estimated cost, time) and the prompt the app wrote. */
+  render?: {
+    quality: 'standard' | 'best'
+    model: string
+    resolution: string
+    usd: number
+    seconds: number
+    predict?: number
+    prediction?: string
+    room: string | null
+    from: string
+    words: string
+    refs: string[]
+    camera: string | null
+    prompt: string
+  }
 }
 
 export interface Repo {

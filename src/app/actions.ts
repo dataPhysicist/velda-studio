@@ -7,9 +7,9 @@ import { opKind } from '../model/table'
 import type { Model as StudioModel } from '../model/types'
 import { assetRegistry } from '../view3d/compile'
 import { MODELS, outputUrls, runReplicate } from '../lib/replicate'
-import { finishFor, themeBrief } from '../lib/theme'
 import type { Attachment, Capture } from '../repo'
-import { snapshotView } from './ViewerExtras'
+import { describeCamera, type Quality, RENDER_RUNS, renderPrompt } from '../ai/render'
+import { snapshotView, viewPose } from './ViewerExtras'
 import { addMessage, commitVersion, rerender, useStudio } from './store'
 
 const get = useStudio.getState
@@ -176,12 +176,18 @@ async function renderRealistic(a: Op) {
   const { sdk, model } = get()
   if (!sdk || !model) throw new Error('needs Toolbelt')
   const id = sid('r')
-  const room = findRoom(model, a.room)
+  const room = findRoom(model, a.room) ?? (get().roomId ? (model.rooms.find((r) => r.id === get().roomId) ?? null) : null)
   const theme = (room?.theme && model.themes[room.theme]) || (model.theme ? model.themes[model.theme] : null)
-  activity(a.from && a.from !== 'view' ? 'Painting the new design into your photo' : 'Rendering this view realistically')
+  const quality: Quality = a.quality === 'best' ? 'best' : 'standard'
+  const photo = !!a.from && a.from !== 'view'
+  activity(photo ? 'Painting the new design into your photo' : 'Rendering this view realistically')
+  const started = Date.now()
+  // The camera in words, from the 3D view as it is now (a photo keeps its own camera).
+  const pose = photo ? null : viewPose()
+  const camera = pose ? describeCamera(model, room?.level ?? get().levelId, pose) : null
   let sourcePath: string
   let designPath: string | null = null
-  if (a.from && a.from !== 'view') {
+  if (photo) {
     sourcePath = String(a.from)
     // A view of the design from the 3D model helps hold the layout; the photo holds the camera.
     designPath = await upload(`velda-studio/renders/${id}-design.png`, await snapshotView(1536, 1024)).catch(() => null)
@@ -191,10 +197,14 @@ async function renderRealistic(a: Op) {
   // Style references (07 section 8): the room's inspiration pictures first, then the theme's, then any
   // Velda named; six at most.
   const refs: string[] = []
-  const add = async (p: string | undefined) => {
+  const refNames: string[] = []
+  const add = async (p: string | undefined, name?: string) => {
     if (!p || refs.length >= 6) return
     const u = /^https?:/.test(p) ? p : await link(p).catch(() => '')
-    if (u && !refs.includes(u)) refs.push(u)
+    if (u && !refs.includes(u)) {
+      refs.push(u)
+      refNames.push(name ?? p.split('/').pop() ?? p)
+    }
   }
   // The room's cards that share the most colors with its theme come first: those are the ones the
   // theme was made from.
@@ -204,52 +214,50 @@ async function renderRealistic(a: Op) {
     ? model.inspiration
         .filter((c) => c.kind !== 'board' && c.rooms.includes(room.id) && c.image)
         .map((c, i) => ({ c, i, n: shared(c) }))
-        .sort((a, b) => b.n - a.n || a.i - b.i)
+        .sort((x, y) => y.n - x.n || x.i - y.i)
         .map((x) => x.c)
     : []
-  for (const c of cards.slice(0, 4)) await add(c.image)
-  for (const im of (theme?.data.images ?? []).slice(0, 2)) await add(im.url ?? im.path)
+  for (const c of cards.slice(0, 4)) await add(c.image, c.title)
+  for (const im of (theme?.data.images ?? []).slice(0, 2)) await add(im.url ?? im.path, im.name)
   for (const r of Array.isArray(a.refs) ? a.refs : []) await add(String(r))
   const images = [await link(sourcePath), ...(designPath ? [await link(designPath)] : []), ...refs]
-  const photo = a.from && a.from !== 'view'
-  const finishes = theme
-    ? (['walls', 'cabinets', 'counters', 'floors', 'metal', 'accent'] as const)
-        .map((r) => {
-          const f = finishFor(theme, r)
-          const pal = theme.data.palette.find((p) => p.role === r)
-          return `${r}: ${pal?.name ?? f.note ?? f.library ?? f.color}`
-        })
-        .join('; ')
-    : ''
-  const prompt = [
-    photo
-      ? 'Image 1 is a real photo of this room as it is today. Produce a photorealistic photo of the SAME room from the EXACT same camera position, lens and framing, remodeled. Keep the walls, ceiling, window and door openings where they are in image 1 unless the design says otherwise.'
-      : 'Image 1 is a simple 3D model view of a remodel design. Produce a photorealistic interior photograph from the EXACT same camera position and framing, keeping every wall, opening, cabinet, fixture and object where image 1 shows it, with the same proportions.',
-    designPath ? 'Image 2 is the 3D design of the remodel; follow its layout and fixtures.' : '',
-    refs.length ? `The last ${refs.length} image(s) are style references for materials and mood only; do not copy their layout.` : '',
-    a.prompt ? `Design: ${a.prompt}` : '',
-    theme ? `Style: ${themeBrief(theme).split('\n')[0]}` : '',
-    finishes ? `Finishes: ${finishes}.` : '',
-    'Natural daylight, realistic materials and soft shadows, professional interior photography, straight verticals. No people, no text, no watermark.',
-  ]
-    .filter(Boolean)
-    .join('\n')
-  const res = await runReplicate(sdk, a.quality === 'best' ? MODELS.photorealBest : MODELS.photoreal, {
+  const prompt = renderPrompt({ model, room, theme, photo, design: !!designPath, refs: refs.length, camera, words: typeof a.prompt === 'string' ? a.prompt : null })
+  const run = RENDER_RUNS[quality]
+  const res = await runReplicate(sdk, run.model, {
     prompt,
     image_input: images,
     aspect_ratio: 'match_input_image',
+    resolution: run.resolution,
     output_format: 'jpg',
   })
   const url = outputUrls(res.output)[0]
   if (!url) throw new Error('no image came back')
   const blob = await (await fetch(url)).blob()
   const outPath = await upload(`velda-studio/renders/${id}.jpg`, blob)
-  const before: Attachment = { path: sourcePath, name: photo ? 'Your photo' : 'Model view', type: 'image/png', role: 'before' } as any
-  const after: Attachment = { path: outPath, name: 'Realistic render', type: 'image/jpeg', role: 'after', preview: URL.createObjectURL(blob) } as any
+  const seconds = (Date.now() - started) / 1000
+  const before: Attachment = { path: sourcePath, name: photo ? 'Your photo' : 'Model view', type: 'image/png', role: 'before' }
+  const after: Attachment = { path: outPath, name: 'Realistic render', type: 'image/jpeg', role: 'after', preview: URL.createObjectURL(blob) }
   await addMessage({
     role: 'assistant',
     body: photo ? 'Here is your room with the new design. Drag across the picture to compare it with your photo.' : 'Here is that view rendered realistically. Drag across it to compare with the model.',
     attachments: [before, after],
+    meta: {
+      render: {
+        quality,
+        model: run.model,
+        resolution: run.resolution,
+        usd: run.usd,
+        seconds: Math.round(seconds),
+        ...(res.predict_time ? { predict: Math.round(res.predict_time) } : {}),
+        ...(res.id ? { prediction: res.id } : {}),
+        room: room?.id ?? null,
+        from: photo ? String(a.from) : 'view',
+        words: typeof a.prompt === 'string' ? a.prompt : '',
+        refs: refNames,
+        camera,
+        prompt,
+      },
+    },
   })
 }
 

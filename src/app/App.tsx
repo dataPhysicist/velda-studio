@@ -1,3 +1,4 @@
+import { RENDER_LABEL, RENDER_RUNS, renderNote } from '../ai/render'
 import { addInspiration } from './inspiration'
 import { classifyLink } from '../inspiration/pinterest'
 import type { Source } from '../inspiration/ingest'
@@ -606,6 +607,7 @@ function Bubble({ m, live }: { m: Message; live: boolean }) {
           </div>
         )
       )}
+      {m.meta?.render && <RenderLine r={m.meta.render} live={live} />}
       <div className="bubble-body">{renderText(m.body)}</div>
       {!!m.meta?.choices?.length && <Choices choices={m.meta.choices} />}
       {!!m.meta?.products?.length && <Products items={m.meta.products} />}
@@ -682,10 +684,33 @@ function Compare({ before, after }: { before: Attachment; after: Attachment }) {
       {!same && <span className="compare-bar" style={{ left: `${x}%` }} />}
       {!same && <span className="compare-tag left">{before.name}</span>}
       <span className="compare-tag right">{same ? after.name : 'New design'}</span>
+      {after.role === 'after' && <span className="compare-label">{RENDER_LABEL}</span>}
       {b && (
         <a className="compare-open" href={b} target="_blank" rel="noreferrer" download="velda-render.jpg">
           Open full size
         </a>
+      )}
+    </div>
+  )
+}
+
+/** Under a render: its quality, size, estimated cost and time, and a way to make it again at best quality. */
+function RenderLine({ r, live }: { r: NonNullable<NonNullable<Message['meta']>['render']>; live: boolean }) {
+  const busy = useStudio((s) => !!s.activity || !!s.thinking)
+  const again = async () => {
+    const { runActions } = await import('./actions')
+    await runActions([{ op: 'render', from: r.from, ...(r.room ? { room: r.room } : {}), ...(r.words ? { prompt: r.words } : {}), quality: 'best' }])
+  }
+  return (
+    <div className="render-line muted small">
+      <span title={r.refs.length ? `Inspiration used:\n${r.refs.join('\n')}` : undefined}>
+        {renderNote(r.quality, r.seconds)}
+        {r.refs.length ? ` · ${r.refs.length === 1 ? '1 inspiration picture' : `${r.refs.length} inspiration pictures`}` : ''}
+      </span>
+      {live && r.quality === 'standard' && (
+        <button type="button" className="link small" disabled={busy} onClick={() => void again()}>
+          Again at best quality (about ${RENDER_RUNS.best.usd.toFixed(2)})
+        </button>
       )}
     </div>
   )

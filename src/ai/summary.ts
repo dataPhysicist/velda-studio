@@ -59,7 +59,7 @@ export function roomAt(m: Model, it: { level: string; x: number; y: number }) {
 }
 
 /** "top", "left" ... the side of the room a wall is on, on the sheet (not a compass direction). */
-function sideWord(e: RoomEdge) {
+export function sideWord(e: RoomEdge) {
   const [x, y] = e.inward
   if (y > 0.9) return 'top'
   if (y < -0.9) return 'bottom'

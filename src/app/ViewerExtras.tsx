@@ -12,6 +12,17 @@ let pipelineRef: { current: SnapshotPipeline | null; camera: THREE.PerspectiveCa
   get: null,
 }
 
+/** Where the 3D camera is and which way it looks (world meters), for describing the framing in words. */
+export function viewPose(): { position: [number, number, number]; direction: [number, number, number]; fov: number; aspect: number } | null {
+  const three = pipelineRef.get?.()
+  const main = three?.camera as THREE.PerspectiveCamera | undefined
+  if (!main) return null
+  const d = new THREE.Vector3()
+  main.getWorldDirection(d)
+  const { width, height } = three.gl.domElement
+  return { position: main.position.toArray() as [number, number, number], direction: d.toArray() as [number, number, number], fov: main.fov, aspect: width / height }
+}
+
 /** PNG/WebP of what the viewer shows now (optionally from another camera pose), at w x h. */
 export async function snapshotView(w = 1536, h = 1024, pose?: { position: number[]; quaternion: number[]; fov: number }): Promise<Blob> {
   const p = pipelineRef.current

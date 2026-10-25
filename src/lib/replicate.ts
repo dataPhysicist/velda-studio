@@ -9,7 +9,7 @@ export const MODELS = {
   to3d: 'tencent/hunyuan-3d-3.1', // product photo -> textured GLB
 }
 
-export type ReplicateResult = { status: string; output: any; error: string | null }
+export type ReplicateResult = { status: string; output: any; error: string | null; id?: string; predict_time?: number | null }
 
 export async function runReplicate(
   sdk: ToolbeltSDK,
@@ -26,7 +26,7 @@ Steps:
 1. Read the model with the Replicate get-model tool (collectionSlug = the owner, modelId = "${model}"). Take latest_version.id as the version. If a field name in the input above does not exist in its schema, map it onto the real field (keep the values; image lists stay lists).
 2. Create the prediction with the create-prediction tool (collectionSlug = the owner, modelId = "${model}", version = that id, input = the JSON as a string), then check it with the get-prediction tool until its status is succeeded, failed or canceled. Wait between checks.
 3. Reply with ONLY one JSON object and nothing else:
-{"status": "succeeded" or "failed", "output": <the prediction's output exactly as returned, URLs unchanged>, "error": <error text or null>}`
+{"status": "succeeded" or "failed", "output": <the prediction's output exactly as returned, URLs unchanged>, "error": <error text or null>, "id": "<the prediction id>", "predict_time": <metrics.predict_time in seconds, or null>}`
   const raw = await sdk.ask(prompt, 'claude-sonnet-4-6', opts.timeoutSeconds ?? 300)
   const start = raw.indexOf('{')
   const end = raw.lastIndexOf('}')
