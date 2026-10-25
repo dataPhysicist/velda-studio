@@ -55,7 +55,7 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 export type Pose = { position: number[]; direction: number[]; fov: number; aspect: number }
 
 /** The current 3D view in words: where the camera is, how it looks, and what it looks toward. */
-export function describeCamera(m: Model, levelId: string | null, pose: Pose): string {
+export function describeCamera(m: Model, levelId: string | null, pose: Pose, preferRoom?: string | null): string {
   const lv = m.levels.find((l) => l.id === levelId) ?? m.levels[0]
   const elev = lv?.elev ?? 0
   const p: Vec = [pose.position[0] / IN, pose.position[2] / IN]
@@ -79,10 +79,27 @@ export function describeCamera(m: Model, levelId: string | null, pose: Pose): st
     const t = dy < -0.05 ? h / -dy : 0
     from = [p[0] + dx * t, p[1] + dz * t]
     room = at(from) ?? inside
+    // The room the render is for wins when it is in the picture (the middle of the view can land on
+    // the closet next to it, or the camera can still be gliding there).
+    const want = preferRoom ? rooms.find((r) => r.id === preferRoom) : undefined
+    if (want && want !== room && inView(want, p, h, pose)) {
+      room = want
+      const b = polygonBounds(want.polygon)
+      from = [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2]
+    }
     where = room ? `above the ${room.name}, with the ceiling and near walls cut away` : 'above the house'
   }
   const toward = room && dir ? facing(m, room, from, dir) : ''
   return `Camera: ${where}, ${look}${toward ? `, toward ${toward}` : ''}; the lens takes in about ${across} degrees across.`
+}
+
+/** Whether the middle of a room's floor is inside the camera's picture. */
+function inView(r: Room, p: Vec, h: number, pose: Pose): boolean {
+  const b = polygonBounds(r.polygon)
+  const v = [(b.x0 + b.x1) / 2 - p[0], -h, (b.y0 + b.y1) / 2 - p[1]]
+  const [dx, dy, dz] = pose.direction
+  const cos = (v[0] * dx + v[1] * dy + v[2] * dz) / (Math.hypot(v[0], v[1], v[2]) * Math.hypot(dx, dy, dz) || 1)
+  return cos >= Math.cos(((pose.fov / 2) * Math.PI) / 180)
 }
 
 /** The wall a line of sight from `o` meets first, with what is on it ("the top wall, with the vanity and a window"). */

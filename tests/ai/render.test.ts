@@ -53,6 +53,26 @@ describe('render prompt', () => {
     expect(describeCamera(m, room.level, pose)).toMatch(/^Camera: above the Primary Bathroom, with the ceiling and near walls cut away, looking down 35 degrees, toward the top wall/)
   })
 
+  it('names the room being rendered when it is in the picture, even if the middle of the view lands next door', () => {
+    const { m, room } = bath()
+    const lv = m.levels.find((l) => l.id === room.level)!
+    const down = (35 * Math.PI) / 180
+    const h = 360
+    const back = h / Math.tan(down)
+    const pose = { position: [700 * IN, (lv.elev + h) * IN, (360 + back) * IN], direction: [0, -Math.sin(down), -Math.cos(down)], fov: 45, aspect: 1 }
+    const c = (r: (typeof m.rooms)[number]) => {
+      const xs = r.polygon.map((p) => p[0])
+      const ys = r.polygon.map((p) => p[1])
+      return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
+    }
+    const others = m.rooms.filter((r) => r.level === room.level && r.id !== room.id && r.polygon.length >= 3)
+    const dist = (r: (typeof m.rooms)[number]) => Math.hypot(c(r)[0] - c(room)[0], c(r)[1] - c(room)[1])
+    const near = others.sort((a, b) => dist(a) - dist(b))[0]
+    const far = others[others.length - 1]
+    expect(describeCamera(m, room.level, pose, near.id)).toContain(`Camera: above the ${near.name}, with the ceiling`)
+    expect(describeCamera(m, room.level, pose, far.id)).toContain('Camera: above the Primary Bathroom, with the ceiling') // not in the picture
+  })
+
   it('is written by the app from the room, the theme, the inspiration and the camera, with N8\'s words last', () => {
     const { m, room } = bath()
     const p = renderPrompt({ model: m, room, theme, photo: false, design: false, refs: 4, camera: 'Camera: inside the Primary Bathroom.', words: 'late afternoon light' })

@@ -185,7 +185,7 @@ async function renderRealistic(a: Op) {
   const started = Date.now()
   // The camera in words, from the 3D view as it is now (a photo keeps its own camera).
   const pose = photo ? null : viewPose()
-  const camera = pose ? describeCamera(model, room?.level ?? get().levelId, pose) : null
+  const camera = pose ? describeCamera(model, room?.level ?? get().levelId, pose, room?.id) : null
   // The render keeps the shape of the view (or the photo), asked for outright.
   const shape = nearestRatio(photo ? ((await photoAspect(String(a.from))) ?? 1.5) : (pose?.aspect ?? 1.5))
   let sourcePath: string
