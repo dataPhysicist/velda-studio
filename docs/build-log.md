@@ -90,6 +90,12 @@ Where Playwright's Chromium download is blocked (this build sandbox), set `PW_CH
 - 2026-10-25 Render prompts (`src/ai/render.ts`) are written by the app: what image 1 is, the room and its size and ceiling, its fixtures and the walls they stand on, the camera in words, the theme's colors by role with hex values, materials, lighting and what to avoid, then N8's own words last. Velda's `render` op carries only his words (`prompt`), and the ops table tells her not to describe the design there and to use `best` only when he asks for it.
 - 2026-10-25 The camera in words comes from the 3D view: inside a room, its height above the floor; from above, the room the middle of the view lands on, "with the ceiling and near walls cut away"; how far it looks down; the wall it looks toward and what is on that wall (fixtures, windows, doors); the lens angle across.
 - 2026-10-25 Render sizes and costs: standard is `google/nano-banana-2` at 1K, about $0.07 an image; best is `google/nano-banana-pro` at 2K, about $0.13. These are Google's list prices for the two models (Gemini API, standard tier); Replicate reports no price in its model or prediction records and its price page could not be read from the build sandbox, so the figures are estimates, unverified against the Replicate invoice. Each render records its model, size, estimate, time, the Replicate prediction id and the prompt in the message (`meta.render`).
+- 2026-10-25 Phase 6 palettes checked independently: the three pictures from the Toolbelt run were measured again with the same script in a separate sandbox run, and every color and share came out identical (for example #dad0c4 25%, #b0a598 21.8%, #584937 21% for the rustic oak vanity). A sub-chat on the faster model reported it has no `execute_code` tool, so measuring stays on the deeper model's sub-chat, which has it.
+- 2026-10-25 Exports are made in the browser (`src/export/`): one plan drawing (`plan-svg.ts`) serves the PDF sheets and the share viewer; schedules and the change log are plain records; the DXF is a hand-written R12 writer; the GLB comes from the share viewer's light 3D builder with every node named by its model id, so it does not need the studio's 3D view open.
+- 2026-10-25 Sheets: 17 x 11 by default (24 x 36 on request), 1/4 in = 1 ft when a level fits and 1/8 in otherwise (A2 at 58'-8" by 51'-3" goes 1/8 on 17 x 11); room names are 7 pt on paper at either scale. Mood boards are pages of the sheet set rather than a separate board.pdf.
+- 2026-10-25 Web pictures (Pinterest) cannot be read by the page, so the PDF, the share page and the package show them as their measured colors with the link; stored pictures (dropped files, chat photos) are embedded. A way to keep a small copy of web pictures (the sandbox can fetch them, but a sub-chat's output files are not saved to storage) is open.
+- 2026-10-25 Share links: the page is one HTML file in Velda storage (`velda-studio/shares/<id>.html`) with the schemes inside, `dist/viewer.js` and three.js from jsDelivr; the link is `manage_shared_artifacts` `create_link` (a signed storage link; 30 days or 1 year was accepted), falling back to a signed URL. It returns no share id, so "turn off" removes the file (or replaces it with a notice), and "update" re-uploads the same file so the link shows the new version. The as-built always goes with a proposed scheme.
+- 2026-10-25 Which as-built a scheme compares with: of the as-built schemes, the one sharing the most wall ids with it (a scheme copied from the A2 import shares its walls).
 
 ## 2026-10-18  Phase 0  commit eaa8f33 (dev release, build 5f119ff)
 
@@ -309,3 +315,30 @@ Open:
 Decisions N8 needs: none.
 
 Next: the page check for Phase 7 when the browser link is back; meanwhile Phase 8, share and handoff.
+
+## 2026-10-25  Phase 8  commits c103490 to 9c68d30 (dev release, build 5f22235)
+
+Done:
+- Export dialog (Export in the title row): the handoff checklist first (what is missing, with Show me), then the parts: PDF sheet set, DXF per scheme, model and as-built JSON, GLB, schedules (rooms, doors, windows, fixtures), change log (sentences, markdown and CSV), inspiration (stored pictures and a list with links). Build package makes a zip named for the project, scheme and date; every file can also be downloaded on its own, with its size.
+- PDF sheet set: cover (schemes, provenance legend, assumed values, open items, engineer items), every level's plan for the as-built and the scheme, demolition and new work, changes, the four schedules, a mood board page per room; title block with project, scheme, version and date, scale and "Design intent. Not for construction. Field verify all dimensions." on every sheet.
+- DXF R12 on AIA layers per level (walls as solid pieces between openings, centerlines, doors with swing arcs, windows, stairs, room names and areas, clear and overall dimensions, fixtures and equipment, notes).
+- Share dialog: Make a link (30 days or 1 year), links for the scheme with copy, update and turn off. The share page shows the plan with dimensions in provenance colors and room names, comment pins with their threads, 3D with an orbit and the cut-away, levels, mood boards and a scheme switcher; read-only, no account, no Toolbelt calls.
+
+Evidence:
+- `npm run check` green inside `scripts/release.sh`: 143 unit tests in 18 files, 14 browser tests (12.1 min).
+- `tests/export/dxf.test.ts`: the A2 DXF passes ezdxf 1.4.5 audit with 0 errors and 0 fixes; AC1009; walls land at the model's coordinates with y flipped; drawn back with ezdxf it matches the plan.
+- `tests/e2e/sheets.spec.ts`: the A2 as-built plus a proposed scheme make 9 sheets (G-0 cover, A-1 and A-2 plans, A-3 demolition, A-4 changes, S-5 to S-8 schedules), 17 x 11; read back with PyMuPDF 1.28.2 the page count matches and the level 2 sheet has "Primary Bedroom" and 19'-8".
+- `tests/e2e/viewer.spec.ts`: dist/viewer.js is 38 KB (under 2 MB); the share page for two A2 schemes is well under 2 MB, loads with every request outside jsDelivr refused and none attempted; plan with 19'-8", one comment pin and its reply, scheme switcher, mood board (a stored picture as a thumbnail, a Pinterest picture as its colors and link), 3D with more than 80 meshes, cut-away and full. Screenshots `docs/buildlog/phase8-viewer-plan.jpg`, `phase8-viewer-3d.jpg`.
+- `tests/e2e/handoff.spec.ts`: in the local preview with a proposed scheme, Build package gives a 155 KB zip with README.md, the sheet set, two DXF files, model.json, as-built.json, model.glb (glTF), four CSV schedules, changes.md and changes.csv, inspiration/index.md, every file non-zero; Share uploads the page with both schemes and makes a 1 year link through `manage_shared_artifacts`, lists it and turns it off. Screenshots `phase8-export.jpg`, `phase8-share.jpg`.
+- `tests/export/export.test.ts`: the plan drawing, schedules, change log sentences ("Laundry Room grows from 15'-0" x 9'-9 3/4" (121 sf) to 15'-0" x 10'-9 3/4" (136 sf).") and the checklist on A2.
+- Checked from the build environment: `create_link` on a test file in `velda-studio/shares/` returned a signed link for 30 days.
+
+Open:
+- In the signed-in page with build 5f22235 (Export, the zip, Share with the real storage, N8 opening the link in a private window): unverified in Toolbelt; the link to the built-in browser on N8's computer has been down since Phase 7.
+- Small copies of web pictures for the PDF and share page (above).
+- `schema/model-v2.schema.json` (08 section 5) does not exist in the repo yet; model.json goes without it.
+- The share page's 3D is the light builder (boxes and floors), not the studio's Pascal scene with finishes.
+
+Decisions N8 needs: none. Needs from N8: open the Claude desktop app so the built-in browser link comes back; then open the share link I send in a private window.
+
+Next: the page checks for Phases 7 and 8 when the browser is back; Phase 9 (first run, tour, empty states, command palette, settings, performance, the 1.0 release, which needs N8's go for the live data migration).
