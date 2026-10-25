@@ -3,6 +3,7 @@
 import { analyzeRoom, captureTransform, packCloud, parseCloud, planImage, thin, unpackCloud } from '../lib/capture'
 import { polygonBounds } from '../model/geom'
 import { type Op, newId as sid } from '../model/ops'
+import { opKind } from '../model/table'
 import type { Model as StudioModel } from '../model/types'
 import { assetRegistry } from '../view3d/compile'
 import { MODELS, outputUrls, runReplicate } from '../lib/replicate'
@@ -13,10 +14,13 @@ import { addMessage, commitVersion, rerender, useStudio } from './store'
 
 const get = useStudio.getState
 const set = useStudio.setState
-const ACTIONS = new Set(['capture', 'capture_align', 'render', 'make_3d'])
-
+/** Model ops go to applyOps, actions run after the reply, turn ops (analyze, propose, research) are the page's. */
 export function splitOps(ops: Op[]) {
-  return { model: ops.filter((o) => !ACTIONS.has(o.op)), actions: ops.filter((o) => ACTIONS.has(o.op)) }
+  return {
+    model: ops.filter((o) => opKind(o.op) === 'model'),
+    actions: ops.filter((o) => opKind(o.op) === 'action'),
+    turn: ops.filter((o) => opKind(o.op) === 'turn'),
+  }
 }
 
 export async function runActions(actions: Op[]) {

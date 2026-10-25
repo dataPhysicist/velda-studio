@@ -53,7 +53,8 @@ export function runChecks(m: Model, opts: CheckOptions = {}): Issue[] {
   for (const it of m.items) {
     // A sink or cooktop set into a counter, island or vanity: the host carries the clearances.
     const host = hostOf(m, it)
-    const others = segs(it.level).filter((s) => s.id !== it.id && s.id !== host?.id)
+    const guests = new Set(m.items.filter((g) => hostOf(m, g)?.id === it.id).map((g) => g.id))
+    const others = segs(it.level).filter((s) => s.id !== it.id && s.id !== host?.id && !guests.has(s.id))
     const room = roomOf(m, it.level, [it.x, it.y])
     const where = { level: it.level, room: room?.id, ids: [it.id] }
     const { c, f, s } = frameOf(it)
@@ -70,8 +71,22 @@ export function runChecks(m: Model, opts: CheckOptions = {}): Issue[] {
       else if (front.dist < S.bath.showerFront.nkba) push({ severity: 'fix', rule: 'shower-front', where, message: `${fmt(front.dist)} clear in front of the ${lc(nameOf(it))}; 2'-6" is recommended.` })
     }
     if (it.kind === 'tub') {
-      const front = clearAlong(frontPts(3), f, others)
-      if (front.dist < S.bath.tubFront.code) push({ severity: 'blocks', rule: 'tub-front', where, message: `Only ${fmt(front.dist)} clear along the open side of the ${lc(nameOf(it))}; code needs 1'-9".` })
+      // The 21 in has to be there along a usable stretch of the open side (at least 2'-6", or half a
+      // short tub), not along every inch: a toilet beside the end of the tub is the usual 5 by 8 bath.
+      const n = Math.max(3, Math.round(it.w / 2))
+      const pts = frontPts(n)
+      const need = Math.min(30, it.w / 2)
+      const step = (it.w - 2) / (n - 1)
+      let run = 0
+      let best = 0
+      let deepest = 0
+      for (const p of pts) {
+        const d = ray(p, f, others).dist
+        deepest = Math.max(deepest, d)
+        run = d >= S.bath.tubFront.code ? run + step : 0
+        best = Math.max(best, run)
+      }
+      if (best < need) push({ severity: 'blocks', rule: 'tub-front', where, message: `Only ${fmt(Math.min(deepest, S.bath.tubFront.code - 0.5))} clear along the open side of the ${lc(nameOf(it))}; code needs 1'-9".` })
     }
     if ((it.kind === 'vanity' || (it.kind === 'sink' && room && ROOM_WET.test(room.name))) && !host) {
       const front = clearAlong(frontPts(3), f, others)

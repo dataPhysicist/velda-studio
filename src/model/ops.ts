@@ -2,8 +2,11 @@
 // them). applyOps validates each op against the rules in 04 "Rules the code must enforce", applies
 // the ones that pass, reports the rest in plain words, and never throws on one bad op.
 import { type Role, ROLES, type Theme, slug } from '../lib/theme'
-import { deriveRooms, moveWall, placeAnchoredItems, updateDimensionStatus } from './derive'
-import { dot, polygonBounds, rv, wallDir, wallLeft, wallLength } from './geom'
+import { LAYOUTS, type Layout, arrangeOps } from './arrange'
+import { bindCoordinate, deriveRooms, moveWall, placeAnchoredItems, updateDimensionStatus } from './derive'
+import { add, dist, dot, isAxisAligned, mul, pointAt, pointInPolygon, polygonBounds, project, rv, sub, wallDir, wallLeft, wallLength } from './geom'
+import { type Align, SIZES, placement, roomEdges, swapPlaces } from './place'
+import { checkShape, opKind } from './table'
 import { formatFeetInches } from './units'
 import {
   type Author,
@@ -57,6 +60,12 @@ export function applyOps(input: Model, ops: Op[], ctx: OpContext = { author: 'us
   let applied = 0
   let geometry = false
   for (const op of ops ?? []) {
+    const bad = checkShape(op)
+    if (bad) {
+      skipped.push(`${(op as Op)?.op ?? 'op'} ${(op as Op)?.id ?? (op as Op)?.wall ?? ''}`.trim() + `: ${bad}`)
+      continue
+    }
+    if (opKind(op.op) !== 'model') continue // actions and turn ops are the page's, not the model's
     try {
       const r = applyOne(model, op, ctx)
       if (typeof r === 'string') skipped.push(`${op?.op} ${op?.id ?? op?.wall ?? ''}`.trim() + `: ${r}`)
@@ -216,9 +225,12 @@ function applyOne(m: Model, op: Op, ctx: OpContext): Applied | string {
         x,
         y,
         rot: num(op.rot) ?? 0,
-        w: num(op.w) ?? 30,
-        d: num(op.d) ?? 24,
-        h: num(op.h) ?? 36,
+        w: num(op.w) ?? SIZES[kind]?.[0] ?? 30,
+        d: num(op.d) ?? SIZES[kind]?.[1] ?? 24,
+        h: num(op.h) ?? SIZES[kind]?.[2] ?? 36,
+        ...(op.anchor && m.walls.some((w) => w.id === op.anchor.wall) && num(op.anchor.at) !== undefined && (op.anchor.side === 'left' || op.anchor.side === 'right')
+          ? { anchor: { wall: String(op.anchor.wall), at: num(op.anchor.at)!, side: op.anchor.side } }
+          : {}),
         ...(num(op.z) !== undefined ? { z: num(op.z) } : {}),
         ...(op.catalog ? { catalog: String(op.catalog) } : {}),
         ...(op.props && typeof op.props === 'object' ? { props: op.props } : {}),
@@ -411,7 +423,7 @@ function applyOne(m: Model, op: Op, ctx: OpContext): Applied | string {
       if (!w) return `no wall ${op.id}`
       const L = wallLength(w)
       const p = vec(op.at) ?? vec([op.x, op.y])
-      let s = num(op.s)
+      let s = num(op.s) ?? num(op.at)
       if (s === undefined && p) s = dot([p[0] - w.a[0], p[1] - w.a[1]], wallDir(w))
       if (s === undefined || s < 1 || s > L - 1) return 'split point must be inside the wall'
       const mine = openingsOn(m, w.id)
@@ -477,6 +489,320 @@ function applyOne(m: Model, op: Op, ctx: OpContext): Applied | string {
       m.rooms = m.rooms.filter((r) => r.id !== drop.id)
       if (op.name) keep.name = String(op.name)
       return { model: m, geometry: true }
+    }
+    case 'place': {
+      const existing = op.id ? m.items.find((i) => i.id === op.id) : undefined
+      if (op.id && !existing && !op.item) return `no item ${op.id}`
+      const host = op.on ? m.items.find((i) => i.id === op.on) : null
+      if (op.on && !host) return `no item ${op.on} to set it into`
+      const spec: Record<string, any> = existing ?? op.item ?? {}
+      const kind: ItemKind = (ITEM_KINDS as readonly string[]).includes(spec.kind) ? spec.kind : 'item'
+      const w = num(spec.w) ?? SIZES[kind]?.[0] ?? 30
+      const d = num(spec.d) ?? SIZES[kind]?.[1] ?? 24
+      const room = op.room ? findRoom(m, op.room) : !host && existing ? (m.rooms.find((r) => r.level === existing.level && pointInPolygon([existing.x, existing.y], r.polygon)) ?? null) : null
+      if (op.room && !room) return `no room ${op.room}`
+      if (!host && !room) return 'say which room, or which item to set it into (on)'
+      const align: Align | undefined = typeof op.align === 'object' && op.align ? { from: op.align.from === 'end' ? 'end' : 'start', in: num(op.align.in) ?? 0 } : ['center', 'start', 'end', 'window'].includes(op.align) ? op.align : undefined
+      const p = placement(m, { w, d, room, against: op.against, on: host, align, offset: num(op.offset), facing: op.facing === 'back' ? 'back' : 'out', skip: new Set(existing ? [existing.id] : []) })
+      if (typeof p === 'string') return p
+      const level = host?.level ?? room!.level
+      if (existing) {
+        Object.assign(existing, { x: p.x, y: p.y, rot: p.rot, level, prov })
+        if (p.anchor) existing.anchor = p.anchor
+        else delete existing.anchor
+        return { model: m, geometry: false }
+      }
+      return applyOne(m, { ...op.item, op: 'add_item', kind, w, d, x: p.x, y: p.y, rot: p.rot, level, ...(p.anchor ? { anchor: p.anchor } : {}) }, ctx)
+    }
+    case 'swap': {
+      const a = m.items.find((i) => i.id === op.a)
+      const b = m.items.find((i) => i.id === op.b)
+      if (!a || !b) return `no item ${a ? op.b : op.a}`
+      const s = swapPlaces(a, b)
+      const [la, lb] = [a.level, b.level]
+      for (const [it, to, lv] of [
+        [a, s.a, lb],
+        [b, s.b, la],
+      ] as const) {
+        Object.assign(it, { x: to.x, y: to.y, rot: to.rot, level: lv, prov })
+        if (to.anchor) it.anchor = to.anchor
+        else delete it.anchor
+      }
+      return { model: m, geometry: false }
+    }
+    case 'arrange': {
+      const room = findRoom(m, op.room)
+      if (!room) return `no room ${op.room}`
+      if (!(LAYOUTS as readonly string[]).includes(op.layout)) return `no layout ${op.layout}`
+      const r = arrangeOps(m, room, op.layout as Layout)
+      let cur = m
+      for (const sub of r.ops) {
+        const res = applyOne(cur, sub as Op, ctx)
+        if (typeof res !== 'string') cur = res.model
+      }
+      const said = [
+        r.removed.length ? `Cleared ${r.removed.length} item${r.removed.length > 1 ? 's' : ''} from the ${room.name}.` : '',
+        r.misses.length ? `Could not meet: ${r.misses.join('; ')}.` : '',
+      ].filter(Boolean)
+      return { model: cur, geometry: false, note: said.join(' ') || undefined }
+    }
+    case 'move_wall': {
+      const w = m.walls.find((x) => x.id === op.id)
+      if (!w) return `no wall ${op.id}`
+      const left = wallLeft(w)
+      const sideOf = (key: any) => {
+        const room = findRoom(m, key)
+        if (!room) return { room: null, side: 0 }
+        const e = roomEdges(m, room).find((x) => x.wall?.id === w.id)
+        return { room, side: e ? (e.side === 'left' ? 1 : -1) : 0 }
+      }
+      let across: number
+      if (num(op.to) !== undefined) {
+        const axis = isAxisAligned(w)
+        if (!axis) return 'this wall runs at an angle; use by and toward'
+        const cur = axis === 'v' ? (w.a[0] + w.b[0]) / 2 : (w.a[1] + w.b[1]) / 2
+        across = (num(op.to)! - cur) * dot(axis === 'v' ? [1, 0] : [0, 1], left)
+      } else if (num(op.by) !== undefined) {
+        if (!op.toward) return 'say which room it moves toward (toward)'
+        const { room, side } = sideOf(op.toward)
+        if (!room) return `no room ${op.toward}`
+        if (!side) return `wall ${w.id} is not a wall of the ${room.name}`
+        across = num(op.by)! * side
+      } else {
+        const { room, side } = sideOf(op.so_that?.room)
+        const clear = num(op.so_that?.clear)
+        if (!room || clear === undefined) return 'so_that needs room and clear'
+        if (!side) return `wall ${w.id} is not a wall of the ${room.name}`
+        const ext = room.polygon.map((p) => dot(p, left))
+        across = -side * (clear - (Math.max(...ext) - Math.min(...ext)))
+      }
+      if (Math.abs(across) < 1 / 16) return { model: m, geometry: false }
+      return applyOne(m, { op: 'move', id: w.id, dx: left[0] * across, dy: left[1] * across }, ctx)
+    }
+    case 'set_dimension': {
+      const room = findRoom(m, op.room)
+      if (!room) return `no room ${op.room}`
+      const axis: Vec = op.axis === 'y' ? [0, 1] : [1, 0]
+      const value = num(op.value)!
+      if (value < 12) return 'a room needs to be at least 1 ft across'
+      const b = polygonBounds(room.polygon)
+      const delta = value - (op.axis === 'y' ? b.y1 - b.y0 : b.x1 - b.x0)
+      if (Math.abs(delta) < 1 / 16) return { model: m, geometry: false }
+      const edges = roomEdges(m, room).filter((e) => e.wall)
+      // The wall on the far (max) side has its inside facing back along the axis, and the reverse.
+      const sideWall = (sign: 1 | -1) => edges.filter((e) => dot(e.inward, axis) * sign > 0.99).sort((p, q) => q.len - p.len)[0]?.wall
+      const anchor = op.anchor === 'max' || op.anchor === 'center' ? op.anchor : 'min'
+      const moves: [Wall | undefined, number][] =
+        anchor === 'min' ? [[sideWall(-1), delta]] : anchor === 'max' ? [[sideWall(1), -delta]] : [[sideWall(-1), delta / 2], [sideWall(1), -delta / 2]]
+      let cur = m
+      for (const [wall, k] of moves) {
+        if (!wall) return `could not find the ${room.name}'s wall on that side`
+        const ww = cur.walls.find((x) => x.id === wall.id)!
+        const across = k * dot(axis, wallLeft(ww))
+        const r = applyOne(cur, { op: 'move', id: ww.id, dx: wallLeft(ww)[0] * across, dy: wallLeft(ww)[1] * across }, ctx)
+        if (typeof r === 'string') return r
+        cur = r.model
+      }
+      return { model: cur, geometry: true }
+    }
+    case 'join_walls': {
+      const A = m.walls.find((x) => x.id === op.a)
+      const B = m.walls.find((x) => x.id === op.b)
+      if (!A || !B || A.id === B.id) return 'needs two different walls'
+      if (A.level !== B.level) return 'the walls are on different levels'
+      if (Math.abs(project(A, B.a).off) > 0.5 || Math.abs(project(A, B.b).off) > 0.5) return 'the walls do not run in one straight line'
+      const ends = (['a', 'b'] as const).flatMap((ea) => (['a', 'b'] as const).filter((eb) => dist(A[ea], B[eb]) < 0.5).map((eb) => [ea, eb] as const))
+      if (!ends.length) return 'the walls do not touch'
+      const [ea, eb] = ends[0]
+      const P = A[ea]
+      const meets = m.walls.some((w) => w.id !== A.id && w.id !== B.id && w.level === A.level && (dist(w.a, P) < 1 || dist(w.b, P) < 1))
+      if (meets) return 'another wall meets them there'
+      const centers = m.openings.filter((o) => o.wall === A.id || o.wall === B.id).map((o) => ({ o, c: pointAt(o.wall === A.id ? A : B, o.at) }))
+      const far = (w: Wall, e: 'a' | 'b'): Vec => (e === 'a' ? [...w.b] : [...w.a]) as Vec
+      A.a = rv(far(A, ea))
+      A.b = rv(far(B, eb))
+      A.prov.a = prov
+      A.prov.b = prov
+      for (const { o, c } of centers) {
+        o.wall = A.id
+        o.at = Math.round(project(A, c).s * 100) / 100
+      }
+      m.walls = m.walls.filter((w) => w.id !== B.id)
+      return { model: m, geometry: true }
+    }
+    case 'open_wall': {
+      const w = m.walls.find((x) => x.id === op.id)
+      if (!w) return `no wall ${op.id}`
+      if (w.exterior) return 'wall is exterior; use a window or door'
+      const L = wallLength(w)
+      const inset = (P: Vec) =>
+        Math.max(0, ...m.walls.filter((o) => o.id !== w.id && o.level === w.level && (dist(o.a, P) < 1 || dist(o.b, P) < 1 || (Math.abs(project(o, P).off) < 1 && project(o, P).s > 0 && project(o, P).s < wallLength(o)))).map((o) => o.t / 2))
+      let from = op.full === true || op.full === 'true' ? inset(w.a) : num(op.from)
+      let to = op.full === true || op.full === 'true' ? L - inset(w.b) : num(op.to)
+      if (from === undefined || to === undefined) return 'needs from and to, or full'
+      if (to < from) [from, to] = [to, from]
+      from = Math.max(0, from)
+      to = Math.min(L, to)
+      const width = to - from
+      if (width < 12) return 'an opening needs to be at least 1 ft wide'
+      const lv = m.levels.find((l) => l.id === w.level)
+      const ceiling = w.h ?? lv?.ceiling ?? 96
+      const header = !(op.header === false || op.header === 'false')
+      const removed = openingsOn(m, w.id).filter((o) => o.at + o.w / 2 > from! && o.at - o.w / 2 < to!)
+      m.openings = m.openings.filter((o) => !removed.includes(o))
+      m.openings.push({
+        id: newId('d'),
+        wall: w.id,
+        kind: 'opening',
+        at: Math.round(((from + to) / 2) * 100) / 100,
+        w: Math.round(width * 100) / 100,
+        h: header ? Math.min(ceiling - 12, 96) : ceiling,
+        style: 'cased',
+        prov: { at: prov, w: prov, h: prov },
+      })
+      if (mayCarryLoad(w)) addLockedNote(m, `Engineer to confirm: wall ${w.id} may carry load and was opened ${formatFeetInches(width)} wide.`, w, ctx)
+      return { model: m, geometry: true, note: removed.length ? `Replaced ${removed.length} opening${removed.length > 1 ? 's' : ''} in that span.` : undefined }
+    }
+    case 'replace_opening': {
+      const o = m.openings.find((x) => x.id === op.id)
+      if (!o) return `no opening ${op.id}`
+      const w = m.walls.find((x) => x.id === o.wall)!
+      const kind = op.kind as OpeningKind
+      if (kind === 'opening' && w.exterior) return 'an outside wall needs a door or window, not an open passage'
+      const insideSide = (): 'left' | 'right' => {
+        const c = pointAt(w, o.at)
+        const n = wallLeft(w)
+        const roomAt = (k: number) => m.rooms.some((r) => r.level === w.level && pointInPolygon(add(c, mul(n, k * (w.t / 2 + 12))), r.polygon))
+        return roomAt(1) && !roomAt(-1) ? 'left' : roomAt(-1) && !roomAt(1) ? 'right' : (o.swing?.side ?? 'left')
+      }
+      const was = o.kind
+      o.kind = kind
+      if (kind === 'opening') {
+        o.style = 'cased'
+        delete o.swing
+        delete o.sill
+        delete o.prov.sill
+        delete o.prov.swing
+        if (o.h < 80) o.h = 80
+      } else if (kind === 'door') {
+        o.style = STYLES.includes(op.style) && !['fixed', 'casement', 'double_hung', 'slider', 'cased'].includes(op.style) ? op.style : 'swing'
+        delete o.sill
+        delete o.prov.sill
+        if (was !== 'door') {
+          o.h = 80
+          o.prov.h = { src: 'default' }
+        }
+        if (o.style === 'swing' || o.style === 'french') {
+          o.swing = o.swing ?? { hinge: 'a', side: insideSide() }
+          o.prov.swing = o.prov.swing ?? { src: 'default' }
+        } else {
+          delete o.swing
+          delete o.prov.swing
+        }
+      } else {
+        o.style = STYLES.includes(op.style) && ['fixed', 'casement', 'double_hung', 'slider'].includes(op.style) ? op.style : 'double_hung'
+        delete o.swing
+        delete o.prov.swing
+        if (was !== 'window') {
+          o.sill = 36
+          o.h = 84
+          o.prov.sill = { src: 'default' }
+          o.prov.h = { src: 'default' }
+        }
+      }
+      if (num(op.w) !== undefined) {
+        const r = applyOne(m, { op: 'update_opening', id: o.id, w: num(op.w) }, ctx)
+        if (typeof r === 'string') return r
+        const nw = num(op.w)!
+        m.openings = m.openings.filter((x) => x === o || x.wall !== o.wall || x.at + x.w / 2 <= o.at - nw / 2 || x.at - x.w / 2 >= o.at + nw / 2)
+      }
+      return { model: m, geometry: true }
+    }
+    case 'set_swing': {
+      const o = m.openings.find((x) => x.id === op.id)
+      if (!o || o.kind !== 'door') return `no door ${op.id}`
+      if (o.style !== 'swing' && o.style !== 'french') return `a ${o.style} door does not swing`
+      const hinge = op.hinge === 'a' || op.hinge === 'b' ? op.hinge : (o.swing?.hinge ?? 'a')
+      let side = op.side === 'left' || op.side === 'right' ? op.side : (o.swing?.side ?? 'left')
+      if (op.into) {
+        const room = findRoom(m, op.into)
+        if (!room) return `no room ${op.into}`
+        const w = m.walls.find((x) => x.id === o.wall)!
+        const c = pointAt(w, o.at)
+        const n = wallLeft(w)
+        const k = w.t / 2 + 12
+        if (pointInPolygon(add(c, mul(n, k)), room.polygon) && room.level === w.level) side = 'left'
+        else if (pointInPolygon(add(c, mul(n, -k)), room.polygon) && room.level === w.level) side = 'right'
+        else return `that door does not open into the ${room.name}`
+      }
+      o.swing = { hinge, side }
+      o.prov.swing = prov
+      return { model: m, geometry: true }
+    }
+    case 'flag_room': {
+      const r = findRoom(m, op.id)
+      if (!r) return `no room ${op.id}`
+      const on = op.on === true || op.on === 'true'
+      r.flags = on ? [...new Set([...r.flags, op.flag])] : r.flags.filter((f) => f !== op.flag)
+      return { model: m, geometry: false }
+    }
+    case 'field_dimension': {
+      const a = vec(op.a)!
+      const b = vec(op.b)!
+      const value = num(op.value)!
+      const L = dist(a, b)
+      if (L < 1) return 'the two points are the same'
+      const axis: Vec = [(b[0] - a[0]) / L, (b[1] - a[1]) / L]
+      const level = levelOk(m, op.level, ctx)
+      // Bind each end to the wall face it was taken from (a face crossing the line within 3 in).
+      const bindAt = (p: Vec, k: number): Dimension['binds'][number] | null => {
+        let best: { id: string; which: 'left' | 'right'; miss: number } | null = null
+        for (const w of m.walls) {
+          if (w.level !== level || Math.abs(dot(wallDir(w), axis)) > 0.1) continue
+          const s = project(w, p).s
+          if (s < -1 || s > wallLength(w) + 1) continue
+          for (const which of ['left', 'right'] as const) {
+            const face = add(w.a, mul(wallLeft(w), (which === 'left' ? 1 : -1) * ((w.tMeasured ?? w.t) / 2)))
+            const miss = Math.abs(dot(sub(face, a), axis) - k)
+            if (miss <= 3 && (!best || miss < best.miss)) best = { id: w.id, which, miss }
+          }
+        }
+        return best ? { kind: 'wall_face', id: best.id, which: best.which } : null
+      }
+      const b0 = bindAt(a, 0)
+      const b1 = bindAt(b, L)
+      const dim: Dimension = {
+        id: newId('dim'),
+        level,
+        a: rv(a),
+        b: rv(b),
+        value,
+        text: String(op.text ?? formatFeetInches(value)),
+        source: 'field',
+        status: 'unresolved',
+        binds: b0 && b1 ? [b0, b1] : [],
+      }
+      let out = m
+      let note: string | undefined
+      if (b0 && b1) {
+        const c0 = bindCoordinate(m, dim, 0)!
+        const c1 = bindCoordinate(m, dim, 1)!
+        const delta = value - Math.abs(c1 - c0)
+        if (Math.abs(delta) > 0.25) {
+          // Field measurements govern: move the end that is not an outside wall (the far end if both are alike).
+          const w1 = m.walls.find((x) => x.id === b1.id)!
+          const w0 = m.walls.find((x) => x.id === b0.id)!
+          const moveFar = !(w1.exterior && !w0.exterior)
+          const wall = moveFar ? w1 : w0
+          const k = (moveFar ? 1 : -1) * delta * Math.sign(c1 - c0 || 1)
+          const r = moveWall(m, wall.id, k * dot(axis, wallLeft(wall)), { src: 'field', ...(op.text ? { note: `field measured ${op.text}` } : {}) })
+          if (!r.ok) return (r as { reason: string }).reason
+          out = r.model
+          note = `Moved wall ${wall.id} ${formatFeetInches(Math.abs(delta))} to match the measured ${dim.text}.`
+        }
+      } else note = `Kept the ${dim.text} measurement; it does not line up with two wall faces, so nothing moved.`
+      out.dimensions.push(dim)
+      return { model: out, geometry: true, note }
     }
     case 'note': {
       if (!op.text) return 'needs text'
