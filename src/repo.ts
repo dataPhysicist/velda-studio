@@ -34,8 +34,12 @@ export type Message = {
   attachments?: Attachment[]
   version_id?: string | null
   chips?: string[]
+  /** Design options Velda proposed (each its own scheme), what it searched for, and so on. */
+  meta?: MessageMeta
   created_at?: string
 }
+
+export type MessageMeta = { choices?: { label: string; scheme_id: string; room?: string | null; level?: string | null }[]; research?: string[] }
 
 export interface Repo {
   kind: 'duckdb' | 'memory'
@@ -125,6 +129,7 @@ export class DuckRepo implements Repo {
     // Model v2: who made each version, from what, and the operations that produced it.
     for (const col of ['parent_id', 'author', 'ops_json', 'label']) await this.q(`ALTER TABLE versions ADD COLUMN IF NOT EXISTS ${col} VARCHAR`)
     await this.q(`ALTER TABLE schemes ADD COLUMN IF NOT EXISTS role VARCHAR`)
+    await this.q(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS meta VARCHAR`)
     await this.q(
       `CREATE TABLE IF NOT EXISTS comments (id VARCHAR PRIMARY KEY, scheme_id VARCHAR, level VARCHAR, at_x DOUBLE, at_y DOUBLE, target VARCHAR, body VARCHAR, author VARCHAR, resolved BOOLEAN DEFAULT false, created_at TIMESTAMP DEFAULT now())`,
     )
@@ -218,15 +223,15 @@ export class DuckRepo implements Repo {
   }
   async messages(schemeId: string) {
     const rows = await this.q(
-      `SELECT id, scheme_id, role, body, attachments, version_id, chips, CAST(created_at AS VARCHAR) created_at FROM messages WHERE scheme_id = ${lit(schemeId)} ORDER BY created_at, id`,
+      `SELECT id, scheme_id, role, body, attachments, version_id, chips, meta, CAST(created_at AS VARCHAR) created_at FROM messages WHERE scheme_id = ${lit(schemeId)} ORDER BY created_at, id`,
     )
-    return rows.map((r) => ({ ...r, attachments: parse(r.attachments, []), chips: parse(r.chips, []) })) as Message[]
+    return rows.map((r) => ({ ...r, attachments: parse(r.attachments, []), chips: parse(r.chips, []), meta: parse(r.meta, undefined) })) as Message[]
   }
   async addMessage(m: Message) {
     await this.q(
-      `INSERT INTO messages (id, scheme_id, role, body, attachments, version_id, chips) VALUES (${lit(m.id)}, ${lit(m.scheme_id)}, ${lit(m.role)}, ${lit(m.body)}, ${json(
+      `INSERT INTO messages (id, scheme_id, role, body, attachments, version_id, chips, meta) VALUES (${lit(m.id)}, ${lit(m.scheme_id)}, ${lit(m.role)}, ${lit(m.body)}, ${json(
         (m.attachments ?? []).map(({ preview, ...a }) => a),
-      )}, ${lit(m.version_id ?? null)}, ${json(m.chips ?? [])})`,
+      )}, ${lit(m.version_id ?? null)}, ${json(m.chips ?? [])}, ${m.meta ? json(m.meta) : 'NULL'})`,
     )
   }
   async themes() {

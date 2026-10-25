@@ -406,3 +406,18 @@ input.fld-num.is-bad { border-color: var(--warn); }
 .look-row { display: grid; grid-template-columns: 52px 1fr; align-items: center; gap: 8px; }
 .look-label { font-size: 13px; color: var(--slate); }
 .look-pop p { margin: 0; }
+
+/* Velda's design options: one card per option scheme with a small plan */
+.choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 12px; }
+.choice { display: flex; flex-direction: column; gap: 6px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.choice.is-open { border-color: var(--verdigris); }
+.choice-label { font-size: 14px; color: var(--graphite); }
+.choice button { border: 1px solid var(--line); background: var(--paper); border-radius: 6px; padding: 5px 10px; font-size: 13px; }
+.choice button:hover:not(:disabled) { border-color: var(--verdigris); color: var(--verdigris); }
+.choice button:disabled { color: var(--slate); }
+.choice-thumb { width: 100%; aspect-ratio: 4 / 3; background: var(--vellum); border-radius: 4px; }
+.choice-thumb.is-empty { background: repeating-linear-gradient(45deg, var(--vellum), var(--vellum) 6px, var(--paper) 6px, var(--paper) 12px); }
+.choice-thumb .t-room { fill: var(--verdigris-soft); stroke: none; }
+.choice-thumb .t-wall { fill: var(--graphite); }
+.choice-thumb .t-open { stroke: var(--vellum); }
+.choice-thumb .t-item { fill: var(--paper); stroke: var(--verdigris); stroke-width: 1.5; vector-effect: non-scaling-stroke; }

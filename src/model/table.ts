@@ -4,7 +4,7 @@
 import { LAYOUTS } from './arrange'
 import { ITEM_KINDS } from './types'
 
-export type FieldType = 'id' | 'number' | 'string' | 'bool' | 'point' | 'enum' | 'object' | 'array' | 'any' | 'number|point' | 'string|object'
+export type FieldType = 'id' | 'ids' | 'number' | 'string' | 'bool' | 'point' | 'enum' | 'object' | 'array' | 'any' | 'number|point' | 'string|object'
 export type Field = { name: string; type: FieldType; required?: boolean; values?: readonly string[]; ph?: string; /** Accepted but not offered in the prompt. */ quiet?: boolean }
 export type OpDef = {
   op: string
@@ -53,7 +53,7 @@ export const OP_TABLE: OpDef[] = [
     oneOf: ['id', 'item'],
     doc: 'puts a new item (item) or an existing one (id) in a room with its back against a wall face, facing into the room, clear of doors and other items; or sets it into an island, counter or vanity with on. The app computes x, y and rot. "start" and "end" are the wall ends as listed for the room.',
   },
-  { op: 'swap', kind: 'model', fields: [req('a', 'id', 'ITEM'), req('b', 'id', 'ITEM')], doc: 'two items trade places, each with its back where the other\'s was.' },
+  { op: 'swap', kind: 'model', fields: [req('a', 'ids', 'ITEM|[ITEMS]'), req('b', 'ids', 'ITEM|[ITEMS]')], doc: 'two items, or two groups that stand together (a refrigerator tower of two columns), trade places: each one\'s back goes where the other\'s was, facing the way the other faced.' },
   { op: 'move', kind: 'model', fields: [req('id', 'id'), ...ITEM_FIELDS.slice(0, 3), f('dx', 'number'), f('dy', 'number'), f('level', 'id'), f('at', 'number'), f('dat', 'number')], doc: 'moves an item (x, y or dx, dy, rot), an opening along its wall (at or dat), or a wall sideways by dx, dy (prefer move_wall).' },
   { op: 'resize', kind: 'model', fields: [req('id', 'id', 'ITEM'), f('w', 'number'), f('d', 'number'), f('h', 'number'), f('z', 'number'), en('anchor', ['center', 'left', 'right'])], doc: 'changes an item\'s size; anchor keeps that end where it is.' },
   { op: 'update_item', kind: 'model', fields: [req('id', 'id', 'ITEM'), f('label', 'string'), f('kind', 'string', 'KIND'), f('catalog', 'string'), f('props', 'object'), ...ITEM_FIELDS], doc: 'changes an item\'s label, kind, model or props.' },
@@ -136,6 +136,8 @@ function typeOk(t: FieldType, v: unknown, values?: readonly string[]): boolean {
   switch (t) {
     case 'id':
       return typeof v === 'string' || typeof v === 'number'
+    case 'ids':
+      return typeof v === 'string' || typeof v === 'number' || (Array.isArray(v) && v.length > 0 && v.every((x) => typeof x === 'string' || typeof x === 'number'))
     case 'number':
       return isNum(v)
     case 'string':
@@ -161,6 +163,7 @@ function typeOk(t: FieldType, v: unknown, values?: readonly string[]): boolean {
 
 const WORD: Record<FieldType, string> = {
   id: 'an id',
+  ids: 'an id or a list of ids',
   number: 'a number of inches',
   string: 'text',
   bool: 'true or false',

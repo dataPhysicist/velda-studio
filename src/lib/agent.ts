@@ -1,10 +1,9 @@
 // Velda: turns what the person says (and any photos) into a reply plus model operations.
-import type { Attachment, Message } from '../repo'
+import type { Attachment } from '../repo'
 import type { ToolbeltSDK } from '../toolbelt'
 import type { Op } from '../model/ops'
-import type { Model as StudioModel } from '../model/types'
-import { describeModel } from './summary'
-import { LIBRARY_FINISHES, ROLES } from './theme'
+
+export { buildPrompt } from '../ai/prompt'
 
 export type AgentAnswer = {
   reply: string
@@ -16,87 +15,12 @@ export type AgentAnswer = {
 export const FAST_MODEL = 'claude-sonnet-4-6'
 export const DEEP_MODEL = 'claude-opus-5-5'
 
-const DEEP = /\b(layouts?|options?|ideas?|design|redesign|rethink|what do you think|suggest|improve|better|critique|review|why|should|compare|plan for|inspiration|style|vibe|feel)\b/i
+// Design questions, options and anything visual go to the deeper model (07 section 1).
+const DEEP =
+  /\b(layouts?|options?|ideas?|design|redesign|rethink|what do you think|what if|suggest|improve|better|best|critique|review|why|should|compare|plan for|inspiration|style|vibe|feel|showers?|fits?|recommend\w*|pinterest|mood|palettes?)\b/i
 
 export function pickModel(text: string, attachments: Attachment[]) {
   return attachments.length || /https?:\/\//.test(text) || DEEP.test(text) || text.length > 280 ? DEEP_MODEL : FAST_MODEL
-}
-
-const CATALOG_HINT =
-  'bathtub, shower-square, shower-angle, toilet, bathroom-sink, fridge, stove, hood, kitchen-counter, dining-table, dining-chair, sofa, livingroom-chair, coffee-table, double-bed, single-bed, bedside-table, dresser, closet, bookshelf, desk, office-chair, floor-lamp, ceiling-lamp, rectangular-carpet, round-carpet, indoor-plant, washing-machine, piano, television, round-mirror'
-
-export function buildPrompt(opts: {
-  model: StudioModel
-  text: string
-  attachments: Attachment[]
-  history: Message[]
-  focus: { roomId: string | null; roomName: string | null; level: string | null }
-}): string {
-  const { model, text, attachments, history, focus } = opts
-  const hist = history
-    .slice(-10)
-    .map((m) => `${m.role === 'user' ? 'Person' : 'Velda'}: ${m.body.slice(0, 600)}`)
-    .join('\n')
-  const lib = Object.entries(LIBRARY_FINISHES)
-    .map(([k, v]) => `${k} (${v})`)
-    .join(', ')
-  return `You are Velda, the design assistant inside Velda Studio, a 3D remodel design app for N8's home. You are a world-class architect and interior designer who specializes in remodels. N8 edits only by describing changes and uploading inspiration photos; you make the change by returning operations on the model.
-
-${toolRules(text, attachments)}
-
-Return ONLY one JSON object (no code fences, no prose outside it):
-{"reply": "...", "summary": "...", "ops": [...], "question": null}
-- reply: 1 to 3 short sentences to N8 saying what you changed (or your answer). Plain words, feet and inches like 3'-0\\" (escape the inch mark inside JSON). No em dashes. Top of the plan (small y) is the front/north of the sheet; say "the wall with the sink" or name the room rather than a compass direction you are unsure of.
-- summary: a 3 to 7 word label for this version, like "Sink moved to island". Empty string if ops is empty.
-- question: only when a wrong guess would waste real work: {"text": "...", "options": ["short answer", "..."]} with 2 to 4 options, and ops [] or the safe part only. Otherwise choose the most reasonable reading, do it, and say what you chose.
-
-OPERATIONS (inches, plan coordinates; ids exactly as listed; you may give new things an "id" to reference later in the same list):
-- {"op":"move","id":ITEM,"x":?,"y":?,"dx":?,"dy":?,"rot":?,"level":?} also moves a wall by dx,dy, or an opening along its wall with "at"/"dat".
-- {"op":"resize","id":ITEM,"w":?,"d":?,"h":?,"z":?,"anchor":"center"|"left"|"right"}
-- {"op":"delete","id":ID} items, walls, openings or rooms.
-- {"op":"add_item","id"?,"kind":KIND,"label":"...","level":"L1","x":..,"y":..,"rot":..,"w":..,"d":..,"h":..,"z"?,"catalog"?}
-  KIND: base_cabinet, island, vanity (cabinet runs; a sink, range, cooktop or dishwasher placed inside a run's footprint becomes part of it), sink, range, cooktop, dishwasher, fridge, oven_tower, tall_cabinet, wall_cabinet (z = bottom height, default 54), hood, tub, shower, toilet, bench, glass (glass panel: w long, d thick, h tall), beam (ceiling beam: z = bottom height), item (furniture from the catalog: ${CATALOG_HINT}).
-- {"op":"update_item","id":ITEM,"label"?,"kind"?,"catalog"?,"props"?}
-- {"op":"add_wall","id"?,"level":"L1","a":[x,y],"b":[x,y],"t":4.5,"h"?,"kind"?:"glass"|"half"} / {"op":"update_wall","id":WALL,"a"?,"b"?,"t"?,"h"?,"kind"?}
-- {"op":"add_opening","wall":WALL,"kind":"door"|"window"|"opening","at"?:inches from wall start to center OR "x","y" a point on the wall,"w":..,"h"?:head height above the floor (doors 80, windows 84),"sill"?:windows only,"shape"?:"arch","style"?:"swing"|"pocket"|"sliding"|"french"|"bifold"|"barn"|"casement"|"double_hung"|"slider"|"fixed","hinge"?:"a"|"b","side"?:"left"|"right"} / {"op":"update_opening","id":OPENING,...}
-- {"op":"room","id":ROOM,"rename"?:"...","theme"?:THEME|null}
-- {"op":"theme","id"?:THEME to edit (omit to create),"name"?,"description"?,"scope"?,"palette"?:[{"name","hex","role","use"}],"materials"?:[{"category","choice"}],"avoid"?:[...],"finishes"?:{ROLE:{"color":"#hex"} or {"library":ID}},"images"?:[{"path"}],"apply_to"?:"house"|ROOM name or id|[...]}
-  Roles: ${ROLES.join(', ')}. Library finishes: ${lib}.
-- {"op":"house_theme","theme":THEME} / {"op":"set_level","id":LEVEL,"ceiling"?:inches,"floorThickness"?:inches} / {"op":"note","text":"..."}
-Actions (these start longer jobs after your reply; say in your reply that you started them):
-- {"op":"render","from":"view" or a photo path,"room":ROOM,"prompt":"what the design looks like, finishes, light","refs"?:[image paths or URLs],"quality"?:"best"} makes a photorealistic image: "view" renders the current 3D view; a photo path paints the design into N8's own photo of the room. Use it for "show me realistically", "what would my bathroom look like", etc. When N8 has sent photos of the room in this conversation, prefer his photo.
-- {"op":"make_3d","id":ITEM,"image":image URL or path} builds a real 3D model of a product from its photo and puts it in the item's place. Use it after add_item for a product link or product photo.
-
-PRODUCTS: when N8 pastes a link to furniture, a fixture or a finish, read the page and find the product name, overall width, depth and height, color or material, and the main product image URL (an https image URL, not the page URL). Then add_item it at its real size where it makes sense (or where N8 says), with "label" as the product name and "props":{"url":PAGE,"image":IMAGE URL,"price":...}, and follow with make_3d for that item using the image. For a pasted product photo, do the same with its storage path as the image. For a finish (tile, paint, counter), update the theme instead.
-
-ACCURACY: never present an assumed number as measured; a ceiling or window height marked assumed is a guess until N8 confirms it. STRUCTURE: never set a wall's bearing to "no"; removing, opening or moving a wall that may carry load always gets "an engineer must confirm".
-
-DESIGN RULES: Put fixtures inside their room, backs against the wall face (wall centerline offset by t/2 + d/2), facing into the room. Base cabinets 24" deep x 36" high; tall 84" to 96"; uppers 12" to 13" deep with bottoms at 54". Kitchen aisles 42" (48" for two cooks); 36" clear in front of a toilet and 15" from its center to a side wall; 30" x 48" clear in front of fixtures. Changing colors or materials means a theme op (house theme or a room's theme); a room-specific look should get its own theme applied to that room. When you remove or widen an opening in a wall that may be load-bearing, say an engineer must confirm the header. Plans are design intent; field measurements govern.
-
-FOCUS: ${focus.roomName ? `room ${focus.roomId} "${focus.roomName}" on ${focus.level}` : focus.level ? `level ${focus.level}` : 'whole house'}. "Here" or "this room" means the focus.
-
-MODEL:
-${describeModel(model, { focusRoomId: focus.roomId })}
-
-RECENT CONVERSATION:
-${hist || '(none)'}
-
-N8: ${text}`
-}
-
-function toolRules(text: string, attachments: Attachment[]) {
-  const links = text.match(/https?:\/\/\S+/g) ?? []
-  const lines: string[] = []
-  if (attachments.length) {
-    lines.push(
-      `ATTACHMENTS: open each file with read_storage_file (fileName exactly as given) and look at it before answering.\n${attachments.map((a) => `- ${a.path} (${a.name}, ${a.type})`).join('\n')}`,
-      `Decide what each photo is. Inspiration (a room, a finish, a color board): capture it as a theme op with exact hex colors sampled from the photo (palette with roles ${ROLES.join(', ')}), the materials and a short description, include images:[{"path":"<file>"}], and apply it to the room N8 names (or the focused room). A product: add_item at its real size and make_3d from the photo. Photos of N8's own room as it is today: describe what you see and offer a realistic render of it remodeled (render with that photo). A plan or drawing: describe it and ask what to do with it.`,
-    )
-  }
-  if (links.length) lines.push(`LINKS: open each link with your web page reading tool (crawling, or web search if the page will not load) before answering: ${links.join(' ')}`)
-  if (!lines.length) lines.push('Do not call any tools. Answer directly.')
-  else lines.push('Do not call any other tools.')
-  return lines.join('\n')
 }
 
 /** Pull the first JSON object out of a model reply. */

@@ -205,6 +205,10 @@ function checkAisle(m: Model, it: Item, others: Seg[], where: Issue['where'], pu
     if (!hit.seg || hit.seg.kind !== 'item') continue
     const other = m.items.find((x) => x.id === hit.seg!.id)
     if (!other || !KITCHEN_KINDS.has(other.kind)) continue
+    // An aisle is between fronts that face each other (or an island); a run ending beside a range
+    // turned the other way is a corner, not an aisle.
+    const fo = frameOf(other).f
+    if (other.kind !== 'island' && fo[0] * d[0] + fo[1] * d[1] > -0.7) continue
     const ids = [it.id, other.id].sort()
     if (hit.dist < S.kitchen.workAisle.one)
       push({

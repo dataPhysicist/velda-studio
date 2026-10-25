@@ -259,18 +259,32 @@ export function placement(m: Model, spec: PlaceSpec): Placement | string {
   return out
 }
 
-/** Two items trade places: each one's back goes where the other's back was, facing the same way. */
-export function swapPlaces(a: Item, b: Item) {
-  const backOf = (it: Item) => {
-    const r = (it.rot * Math.PI) / 180
+/** Two items, or two groups of items (a refrigerator tower of two columns), trade places: each group's
+ * back line goes where the other's was, centered on it, facing the way the other faced. */
+export function swapPlaces(A: Item[], B: Item[]) {
+  type Frame = { anchor: Vec; f: Vec; s: Vec; rot: number }
+  const frameOf = (items: Item[]): Frame => {
+    const r = (items[0].rot * Math.PI) / 180
     const f: Vec = [Math.sin(r), Math.cos(r)]
-    return { back: add([it.x, it.y], mul(f, -it.d / 2)), f }
+    const s: Vec = [Math.cos(r), -Math.sin(r)]
+    // The back line is the back of the deepest-set item; the anchor is its middle across the group.
+    const backs = items.map((it) => dot(add([it.x, it.y], mul(f, -it.d / 2)), f))
+    const lo = Math.min(...items.map((it) => dot([it.x, it.y], s) - it.w / 2))
+    const hi = Math.max(...items.map((it) => dot([it.x, it.y], s) + it.w / 2))
+    const back = Math.min(...backs)
+    const mid = (lo + hi) / 2
+    return { anchor: add(mul(f, back), mul(s, mid)), f, s, rot: items[0].rot }
   }
-  const A = backOf(a)
-  const B = backOf(b)
-  const at = (to: { back: Vec; f: Vec }, it: Item) => {
-    const c = add(to.back, mul(to.f, it.d / 2))
-    return { x: r8(c[0]), y: r8(c[1]) }
-  }
-  return { a: { ...at(B, a), rot: b.rot, anchor: b.anchor ? { ...b.anchor } : undefined }, b: { ...at(A, b), rot: a.rot, anchor: a.anchor ? { ...a.anchor } : undefined } }
+  const fa = frameOf(A)
+  const fb = frameOf(B)
+  const move = (items: Item[], from: Frame, to: Frame) =>
+    items.map((it) => {
+      const rel = sub([it.x, it.y], from.anchor)
+      const ls = dot(rel, from.s)
+      const lf = dot(rel, from.f)
+      const p = add(add(to.anchor, mul(to.s, ls)), mul(to.f, lf))
+      const rot = (((it.rot + to.rot - from.rot) % 360) + 360) % 360
+      return { id: it.id, x: r8(p[0]), y: r8(p[1]), rot }
+    })
+  return [...move(A, fa, fb), ...move(B, fb, fa)]
 }

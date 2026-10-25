@@ -9,7 +9,7 @@ import type { Author, Comment, Model } from '../model/types'
 import { IN } from '../model/units'
 import { compileScene } from '../view3d/compile'
 import handChecked from '../../scripts/plan-openings/level2-asbuilt-walls.json'
-import type { Attachment, Message, Repo, Scheme, StoredModel, Version } from '../repo'
+import type { Attachment, Message, MessageMeta, Repo, Scheme, StoredModel, Version } from '../repo'
 import type { ToolbeltSDK } from '../toolbelt'
 import { useViewer } from '@pascal-app/viewer'
 import { type Focus, showScene } from './scene'
@@ -332,6 +332,22 @@ export async function uploadVideo(file: File, progress: (label: string) => void)
   return out
 }
 
+/** Ops the app could not apply last turn; Velda hears about them next turn so it never claims them. */
+let skippedLastTurn: string[] = []
+let asBuiltCache: { id: string; model: Model } | null = null
+
+/** The head of the as-built scheme (for checks that compare with the house as it is, like toilet drains). */
+async function asBuiltModel(): Promise<Model | null> {
+  const { repo, schemes } = get()
+  const s = schemes.find((x) => x.role === 'asbuilt' || (x.role == null && /^as-built/i.test(x.name)))
+  if (!repo || !s?.head_version) return null
+  if (asBuiltCache?.id === s.head_version) return asBuiltCache.model
+  const stored = await repo.model(s.head_version).catch(() => null)
+  const model = stored && !isV1(stored) ? (stored as Model) : null
+  if (model) asBuiltCache = { id: s.head_version, model }
+  return model
+}
+
 export async function send(text: string, attachments: Attachment[] = []) {
   const { sdk, model, thinking } = get()
   const body = text.trim()
@@ -346,31 +362,49 @@ export async function send(text: string, attachments: Attachment[] = []) {
   const modelName = pickModel(body, attachments)
   set({ thinking: { model: modelName, started: Date.now() } })
   try {
-    const prompt = buildPrompt({
-      model,
-      text: body || 'See the attached photos.',
-      attachments,
-      history,
-      focus: { roomId: room?.id ?? null, roomName: room?.name ?? null, level: room?.level ?? get().levelId },
-    })
-    const ans = await askVelda(sdk, prompt, modelName)
+    const { runChecks, checksFor } = await import('../analysis/checks')
+    const { plain } = await import('./editor')
+    const asBuilt = isAsBuilt()
+    const reference = await asBuiltModel()
+    const focus = { roomId: room?.id ?? null, roomName: room?.name ?? null, level: room?.level ?? get().levelId }
+    const promptFor = (m: Model, extra: Partial<Parameters<typeof buildPrompt>[0]> = {}) =>
+      buildPrompt({
+        model: m,
+        text: body || 'See the attached photos.',
+        attachments,
+        history,
+        focus,
+        asBuilt: isAsBuilt(),
+        checks: runChecks(m, { asBuilt: reference }),
+        recentVersions: get().versions.slice(-5).map((v) => v.summary),
+        skipped: skippedLastTurn,
+        ...extra,
+      })
+    const ans = await askVelda(sdk, promptFor(model), modelName)
+    skippedLastTurn = []
     let versionId: string | null = null
     let note = ''
+    let reply = ans.reply
+    let question = ans.question
+    let meta: MessageMeta | undefined
     const { splitOps, runActions } = await import('./actions')
-    const { model: modelOps, actions } = splitOps(ans.ops)
+    const { model: modelOps, actions, turn } = splitOps(ans.ops)
+    const research = turn.filter((o) => o.op === 'research' && o.query)
+    if (research.length) meta = { research: research.map((o) => String(o.query)) }
+    const unclear = (list: string[]) => list.map((x) => plain(x.replace(/^[a-z_0-9]+( [^:]*)?: /, ''))).join('; ')
     if (modelOps.length) {
       // Velda never edits the record of the house as it is today: design changes go to a new scheme.
+      // The ops are tried first, so a request that changes nothing does not leave an empty copy.
       const records = modelOps.every((o) => o.op === 'note' || o.op === 'field_dimension')
-      let branched = ''
-      if (isAsBuilt() && !records) {
-        branched = ans.summary || 'Option 1'
-        await newSchemeFromCurrent(uniqueSchemeName(branched))
-      }
+      const branching = asBuilt && !records
       const summary = ans.summary || 'Change from Velda'
-      const res = applyOps(get().model!, modelOps, { author: 'ai', versionLabel: nextVersionLabel(summary), focusLevel: room?.level ?? get().levelId })
-      if (branched) note += `\n\nI made this change in a new scheme, "${get().schemes.find((x) => x.id === get().schemeId)?.name}", so your as-built record stays as it is.`
+      const res = applyOps(get().model!, modelOps, { author: 'ai', versionLabel: branching ? `v2 ${summary}` : nextVersionLabel(summary), focusLevel: room?.level ?? get().levelId })
+      if (branching && res.applied) {
+        await newSchemeFromCurrent(uniqueSchemeName(ans.summary || 'Option 1'))
+        note += `\n\nI made this change in a new scheme, "${get().schemes.find((x) => x.id === get().schemeId)?.name}", so your as-built record stays as it is.`
+      }
       if (res.applied) {
-        const v = await commitVersion(res.model, summary, 'chat', { author: 'ai', ops: modelOps })
+        const v = await commitVersion(res.model, summary, 'chat', { author: 'ai', ops: [...modelOps, ...research] })
         versionId = v.id
         // Save any theme Velda created or changed to the library for reuse.
         for (const t of Object.values(res.model.themes)) {
@@ -381,14 +415,46 @@ export async function send(text: string, attachments: Attachment[] = []) {
       }
       if (res.skipped.length) {
         console.warn('[studio] skipped ops', res.skipped)
-        if (!res.applied) note = "\n\nI couldn't apply that change to the model. Try describing it another way."
+        skippedLastTurn = res.skipped
+        if (res.applied) note += `\n\nI could not do all of it: ${unclear(res.skipped)}.`
+        else {
+          // Nothing changed, so Velda's reply (which describes the change) would not be true.
+          reply = `I could not apply that to the model: ${unclear(res.skipped)}. Try saying it another way.`
+          question = null
+        }
+      }
+      const said = res.notes.filter((n) => !/^Engineer to confirm/.test(n) && !/^Kept |^Replaced /.test(n)).map(plain)
+      if (res.applied && said.length) note += `\n\n${said.join(' ')}`
+    }
+    const propose = turn.find((o) => o.op === 'propose')
+    if (propose) {
+      const made = await proposeOptions(propose, room?.id ?? null)
+      if (made.choices.length) meta = { ...meta, choices: made.choices }
+      if (made.skipped.length) note += `\n\nSome of the options did not fully apply: ${unclear(made.skipped)}.`
+    }
+    const analyze = turn.find((o) => o.op === 'analyze')
+    if (analyze) {
+      // Two steps: the page ran Velda's ops; now the checker runs and Velda writes the reply from it.
+      const now = get().model!
+      const scopeRoom = analyze.scope && analyze.scope !== 'house' ? (now.rooms.find((r) => r.id === analyze.scope || r.name.toLowerCase() === String(analyze.scope).toLowerCase()) ?? null) : analyze.scope === 'house' ? null : room
+      const issues = checksFor(now, scopeRoom?.id ?? null, { asBuilt: reference })
+      set({ thinking: { model: modelName, started: Date.now() } })
+      const ans2 = await askVelda(sdk, promptFor(now, { analysis: { scope: scopeRoom ? `the ${scopeRoom.name}` : 'the house', issues, changed: ans.summary } }), modelName)
+      reply = ans2.reply || reply
+      question = ans2.question ?? question
+      const fixOps = splitOps(ans2.ops).model
+      if (fixOps.length) {
+        const res = applyOps(get().model!, fixOps, { author: 'ai', versionLabel: nextVersionLabel(ans2.summary || 'Fixes from the checks'), focusLevel: room?.level ?? get().levelId })
+        if (res.applied) versionId = (await commitVersion(res.model, ans2.summary || 'Fixes from the checks', 'chat', { author: 'ai', ops: fixOps })).id
+        if (res.skipped.length) skippedLastTurn = [...skippedLastTurn, ...res.skipped]
       }
     }
     await addMessage({
       role: 'assistant',
-      body: (ans.reply || (ans.question ? '' : 'Done.')) + (ans.question ? `${ans.reply ? '\n\n' : ''}${ans.question.text}` : '') + note,
+      body: (reply || (question ? '' : 'Done.')) + (question ? `${reply ? '\n\n' : ''}${question.text}` : '') + note,
       version_id: versionId,
-      chips: ans.question?.options ?? [],
+      chips: question?.options ?? [],
+      ...(meta ? { meta } : {}),
     })
     if (actions.length) {
       set({ thinking: null })
@@ -399,6 +465,35 @@ export async function send(text: string, attachments: Attachment[] = []) {
   } finally {
     set({ thinking: null })
   }
+}
+
+/** Velda's design options: one new scheme per option, branched from the head of this one. */
+export async function proposeOptions(op: Op, roomId: string | null) {
+  const { repo, model, headId, schemeId, schemes, levelId } = get()
+  const choices: NonNullable<MessageMeta['choices']> = []
+  const skipped: string[] = []
+  if (!repo || !model) return { choices, skipped }
+  const { opKind } = await import('../model/table')
+  const level = roomId ? (model.rooms.find((r) => r.id === roomId)?.level ?? levelId) : levelId
+  let sort = (schemes[schemes.length - 1]?.sort ?? 0) + 1
+  const from = schemes.find((s) => s.id === schemeId)?.name ?? 'this scheme'
+  for (const [i, opt] of (Array.isArray(op.options) ? op.options : []).slice(0, 3).entries()) {
+    const label = String(opt?.label || `Option ${i + 1}`).slice(0, 60)
+    const ops = (Array.isArray(opt?.ops) ? opt.ops : []).filter((o: Op) => o && opKind(o.op) === 'model')
+    const res = applyOps(model, ops, { author: 'ai', versionLabel: `v1 ${label}`, focusLevel: level })
+    skipped.push(...res.skipped.map((x) => `${label}: ${x}`))
+    if (!res.applied) continue
+    const id = sid('s')
+    const name = uniqueSchemeName(label)
+    const scheme: Scheme = { id, name, head_version: null, sort: sort++, role: 'proposed' }
+    await repo.saveScheme(scheme)
+    const v: Version = { id: sid('v'), scheme_id: id, seq: 1, summary: `${label} (from ${from})`, source: 'propose', parent_id: headId, author: 'ai', ops_json: JSON.stringify(ops), label: `v1 ${label}` }
+    await repo.addVersion(v, res.model)
+    await repo.saveScheme({ ...scheme, head_version: v.id })
+    set({ schemes: [...get().schemes, { ...scheme, head_version: v.id }] })
+    choices.push({ label, scheme_id: id, room: roomId, level })
+  }
+  return { choices, skipped }
 }
 
 /**

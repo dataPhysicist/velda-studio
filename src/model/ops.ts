@@ -515,18 +515,19 @@ function applyOne(m: Model, op: Op, ctx: OpContext): Applied | string {
       return applyOne(m, { ...op.item, op: 'add_item', kind, w, d, x: p.x, y: p.y, rot: p.rot, level, ...(p.anchor ? { anchor: p.anchor } : {}) }, ctx)
     }
     case 'swap': {
-      const a = m.items.find((i) => i.id === op.a)
-      const b = m.items.find((i) => i.id === op.b)
-      if (!a || !b) return `no item ${a ? op.b : op.a}`
-      const s = swapPlaces(a, b)
-      const [la, lb] = [a.level, b.level]
-      for (const [it, to, lv] of [
-        [a, s.a, lb],
-        [b, s.b, la],
-      ] as const) {
-        Object.assign(it, { x: to.x, y: to.y, rot: to.rot, level: lv, prov })
-        if (to.anchor) it.anchor = to.anchor
-        else delete it.anchor
+      const ids = (v: any) => (Array.isArray(v) ? v : [v]).map(String)
+      const A = ids(op.a).map((id) => m.items.find((i) => i.id === id))
+      const B = ids(op.b).map((id) => m.items.find((i) => i.id === id))
+      const missing = [...ids(op.a), ...ids(op.b)].find((id) => !m.items.some((i) => i.id === id))
+      if (missing) return `no item ${missing}`
+      if (A.some((x) => B.includes(x))) return 'an item cannot swap with itself'
+      const la = A[0]!.level
+      const lb = B[0]!.level
+      for (const to of swapPlaces(A as Item[], B as Item[])) {
+        const it = m.items.find((i) => i.id === to.id)!
+        const level = A.includes(it) ? lb : la
+        Object.assign(it, { x: to.x, y: to.y, rot: to.rot, level, prov })
+        delete it.anchor // re-anchored by the next wall-relative placement; positions are exact now
       }
       return { model: m, geometry: false }
     }

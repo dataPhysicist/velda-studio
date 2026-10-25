@@ -1,3 +1,4 @@
+import { Choices } from './Choices'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { finishFor, ROLES, swatches, type Theme } from '../lib/theme'
 import type { Attachment, Message } from '../repo'
@@ -585,6 +586,7 @@ function Bubble({ m, live }: { m: Message; live: boolean }) {
         )
       )}
       <div className="bubble-body">{renderText(m.body)}</div>
+      {!!m.meta?.choices?.length && <Choices choices={m.meta.choices} />}
       {v && (
         <button type="button" className="ver-link" aria-current={v.id === headId} onClick={() => goToVersion(v.id)}>
           {v.id === headId ? `Showing version ${v.seq}` : `Show version ${v.seq}`}
