@@ -87,6 +87,9 @@ Where Playwright's Chromium download is blocked (this build sandbox), set `PW_CH
 - 2026-10-25 Shower fit (`src/library/fit.ts`): each type in `src/library/showers.json` is tried in each corner of the room, on wall stretches clear of doors and their swings, with its depth checked to the facing wall and 2'-0" clear in front; a wet room is judged by the room's size; a steam shower needs a ceiling of 8'-0" or less. Velda's prompt lists only the types that fit, and only when the talk is about a shower, tub or bath fixture.
 - 2026-10-25 A placed product takes a short name (the part of its title before a comma, dash or bracket, at most 48 characters at a word break). Check messages keep a product name's capitals.
 - 2026-10-25 Corrected: `scripts/release.sh` had not been committing source since the `schema` folder went away (one missing path makes `git add` stage nothing), so builds were made from the working tree with the source committed by hand or not at all. Build 596819d's source was committed after the fact as 2c34aba and rebuilt to the same bytes; the script now stages only paths that exist.
+- 2026-10-25 Render prompts (`src/ai/render.ts`) are written by the app: what image 1 is, the room and its size and ceiling, its fixtures and the walls they stand on, the camera in words, the theme's colors by role with hex values, materials, lighting and what to avoid, then N8's own words last. Velda's `render` op carries only his words (`prompt`), and the ops table tells her not to describe the design there and to use `best` only when he asks for it.
+- 2026-10-25 The camera in words comes from the 3D view: inside a room, its height above the floor; from above, the room the middle of the view lands on, "with the ceiling and near walls cut away"; how far it looks down; the wall it looks toward and what is on that wall (fixtures, windows, doors); the lens angle across.
+- 2026-10-25 Render sizes and costs: standard is `google/nano-banana-2` at 1K, about $0.07 an image; best is `google/nano-banana-pro` at 2K, about $0.13. These are Google's list prices for the two models (Gemini API, standard tier); Replicate reports no price in its model or prediction records and its price page could not be read from the build sandbox, so the figures are estimates, unverified against the Replicate invoice. Each render records its model, size, estimate, time, the Replicate prediction id and the prompt in the message (`meta.render`).
 
 ## 2026-10-18  Phase 0  commit eaa8f33 (dev release, build 5f119ff)
 
@@ -285,3 +288,23 @@ Open:
 Decisions N8 needs: none.
 
 Next: Phase 7, renders: the prompt built from theme, inspiration and camera; the best quality path; labels; one before and after of the primary bath from the current 3D view; cost per render.
+
+## 2026-10-25  Phase 7  commit 5d5c111 (dev release, build 1b3ca76)
+
+Done:
+- The render prompt is the app's (decisions above); Velda adds only N8's words.
+- Every render shows "Mood, not dimensions" on the picture, and under it its quality, size, estimated cost, time and how many inspiration pictures it used (their names on hover). "Again at best quality (about $0.13)" makes it again with the Pro model at 2K from the current view.
+- The Replicate run reports its prediction id and run time, kept with the render.
+
+Evidence:
+- `npm run check` green inside `scripts/release.sh`: 136 unit tests in 16 files (new `tests/ai/render.test.ts` 5: the camera inside the A2 primary bath at 5'-3" looking at the vanity wall, the cut-away view from above, the prompt from room, fixtures, theme, inspiration and camera with N8's words last, a photo render, the cost line), 11 browser tests (new `tests/e2e/render.spec.ts`: "Render the primary bath realistically from this view" in the 3D view through the real send path and render action with stand-ins for Velda and Replicate; the Replicate input is `google/nano-banana-2` at 1K with the app's prompt ending in N8's words; the render shows the label and "Standard, 1K · about $0.07 · 29 s"; the best quality button runs `google/nano-banana-pro` at 2K). Screenshot `docs/buildlog/phase7-render-labeled.jpg` (local preview).
+- The Phase 6 render in the Toolbelt page (before this change, Velda chose best quality on her own): 77 s from asking to the picture, `nano-banana-pro` at its default size (1696 x 2528), about $0.13.
+
+Open:
+- The before and after render of the primary bath from the current 3D view in the signed-in page with build 1b3ca76: unverified in Toolbelt. The link to the built-in browser on N8's computer dropped before the release finished.
+- Replicate's real price per image: unverified (estimates above).
+- `google/nano-banana-2.1` came out this month at about half the price of nano-banana-2 with sharper output; switching standard renders to it is a one-line change worth trying once the page check is done.
+
+Decisions N8 needs: none.
+
+Next: the page check for Phase 7 when the browser link is back; meanwhile Phase 8, share and handoff.
