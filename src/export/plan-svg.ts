@@ -78,7 +78,7 @@ export function planSvg(m: Model, o: PlanSvgOpts): { svg: string; bounds: { x0: 
       const label = (it.label || it.kind.replace(/_/g, ' ')).split(/,\s/)[0]
       const size = Math.min(T * 0.75, Math.max(2.5, Math.min(it.w, it.d) * 0.28))
       out.push(
-        `<g transform="translate(${n2(it.x)} ${n2(it.y)}) rotate(${n2(-it.rot)})"><rect x="${n2(-it.w / 2)}" y="${n2(-it.d / 2)}" width="${n2(it.w)}" height="${n2(it.d)}" fill="#ffffff" stroke="#737d83" stroke-width="0.6"/>${
+        `<g transform="translate(${n2(it.x)} ${n2(it.y)}) rotate(${n2(-it.rot)})"><title>${esc(`${label}, ${ft(it.w)} x ${ft(it.d)}`)}</title><rect x="${n2(-it.w / 2)}" y="${n2(-it.d / 2)}" width="${n2(it.w)}" height="${n2(it.d)}" fill="#ffffff" stroke="#737d83" stroke-width="0.6"/>${
           it.w >= 14 && it.d >= 8 && label.length * size * 0.55 < it.w ? text([0, size * 0.35], label, size, '#4a5257') : ''
         }</g>`,
       )

@@ -3,6 +3,7 @@
 // threads, mood boards, and a scheme switcher when more than one scheme was shared. Plain DOM and
 // three.js from jsDelivr; no Toolbelt calls.
 import { BADGE_COLOR, BADGE_WORD, planSvg } from '../export/plan-svg'
+import { type Table, cellText, schedules } from '../export/schedules'
 import { ROLES, finishFor, paletteFor } from '../lib/theme'
 import { polygonArea, polygonBounds } from '../model/geom'
 import type { Inspiration, Model, Room } from '../model/types'
@@ -11,7 +12,7 @@ import type { ViewerData, ViewerScheme } from './data'
 import { buildScene } from './scene3d'
 import CSS from './viewer.css?raw'
 
-type State = { scheme: number; level: string | null; view: 'plan' | '3d'; cut: boolean; tab: 'comments' | 'mood' | 'info'; pin: string | null }
+type State = { scheme: number; level: string | null; view: 'plan' | '3d'; cut: boolean; tab: 'comments' | 'sizes' | 'mood' | 'info'; pin: string | null }
 
 const data: ViewerData = JSON.parse(document.getElementById('velda-data')!.textContent || '{}')
 const root = document.getElementById('velda-viewer')!
@@ -218,6 +219,7 @@ function side() {
     ...(
       [
         ['comments', `Comments (${s.comments.length})`],
+        ['sizes', 'Sizes'],
         ['mood', 'Mood boards'],
         ['info', 'About'],
       ] as const
@@ -225,6 +227,7 @@ function side() {
   )
   const body = h('div', { class: 'vw-panel' })
   if (st.tab === 'comments') body.append(...comments(s))
+  else if (st.tab === 'sizes') body.append(...sizes(s.model))
   else if (st.tab === 'mood') body.append(...moods(s.model))
   else body.append(...about(s))
   return h('aside', { class: 'vw-side' }, tabs, body)
@@ -249,6 +252,39 @@ function comments(s: ViewerScheme) {
       ...c.replies.map((r) => h('div', { class: 'vw-reply' }, h('div', { class: 'vw-meta' }, `${r.author} · ${r.created_at.slice(0, 10)}`), h('p', {}, r.body))),
     )
   })
+}
+
+/** What each schedule shows here (the CSV and PDF keep every column, ids included). */
+const SHOW: Record<string, string[]> = {
+  rooms: ['name', 'width_in', 'depth_in', 'area_sf', 'ceiling_in'],
+  doors: ['rooms', 'width_in', 'height_in', 'style', 'swing'],
+  windows: ['room', 'width_in', 'head_in', 'sill_in', 'style', 'egress'],
+  items: ['room', 'item', 'width_in', 'depth_in', 'height_in', 'vendor'],
+}
+
+/** The rooms, doors, windows and fixtures of the level shown, with their sizes (02 success criterion 4). */
+function sizes(m: Model) {
+  const level = m.levels.find((l) => l.id === st.level)?.name
+  const out: HTMLElement[] = [h('p', { class: 'muted' }, `${level ?? 'Every level'}. Rooms are wall to wall; heights are from the floor.`)]
+  for (const t of schedules(m)) {
+    const rows = t.rows.filter((r) => !level || r.level === level)
+    if (!rows.length) continue
+    const cols = t.cols.filter((c) => SHOW[t.name]?.includes(c.key))
+    const cell = (t: Table, c: Table['cols'][number], r: Table['rows'][number]) => {
+      const v = cellText(t, c, r)
+      return c.key === 'vendor' && r.link ? h('a', { href: String(r.link), target: '_blank', rel: 'noreferrer noopener' }, v || 'link') : v
+    }
+    out.push(
+      h('h3', {}, t.title),
+      h(
+        'table',
+        { class: 'vw-table' },
+        h('thead', {}, h('tr', {}, ...cols.map((c) => h('th', {}, c.label)))),
+        h('tbody', {}, ...rows.map((r) => h('tr', {}, ...cols.map((c) => h('td', { class: c.ft || c.key === 'area_sf' ? 'num' : undefined }, cell(t, c, r)))))),
+      ),
+    )
+  }
+  return out
 }
 
 function moods(m: Model) {

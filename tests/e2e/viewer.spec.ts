@@ -2,6 +2,8 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from '@playwright/test'
+import { formatFeetInches } from '../../src/model/units'
+import { jargon } from './plain'
 import jpeg from 'jpeg-js'
 import { THREE_VERSION, viewerHtml } from '../../src/export/viewer-html'
 import type { ViewerData } from '../../src/viewer/data'
@@ -93,6 +95,15 @@ test('viewer: the share page works on its own, from jsDelivr only', async ({ pag
   await expect(mood.locator('.vw-pics img')).toHaveCount(1)
   await expect(mood.locator('.vw-chips span')).toHaveCount(2)
   await expect(mood.getByRole('link', { name: 'pinterest.com' })).toHaveAttribute('href', 'https://www.pinterest.com/pin/1/')
+  // Sizes: the level's rooms, doors, windows and fixtures, each with its size (02 success criterion 4).
+  await page.getByRole('tab', { name: 'Sizes' }).click()
+  const panel = page.locator('.vw-panel')
+  await expect(panel.locator('table').first()).toContainText('Primary Bedroom')
+  for (const title of ['Rooms', 'Doors and openings', 'Windows', 'Fixtures and products']) await expect(panel.getByRole('heading', { name: title })).toBeVisible()
+  const fx = proposed.items.find((i) => i.level === bedroom.level)!
+  await expect(panel.locator('table').last()).toContainText(formatFeetInches(fx.w))
+  expect(await jargon(page, 'the share page')).toEqual([])
+  await page.screenshot({ path: `${SHOTS}/phase9-viewer-sizes.jpg`, type: 'jpeg', quality: 80 })
   // 3D, cut away and full.
   await page.getByRole('button', { name: '3D' }).click()
   await expect.poll(() => page.evaluate(() => (window as any).__viewer.meshes as number), { timeout: 60_000 }).toBeGreaterThan(80)

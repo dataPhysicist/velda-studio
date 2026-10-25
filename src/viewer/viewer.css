@@ -43,3 +43,7 @@
 .vw-cap { color: #4a5257; }
 .vw-pics a { color: #2e6b62; }
 @media (max-width: 760px) { .vw-body { grid-template-columns: 1fr; grid-template-rows: 60vh auto; } .vw-side { border-left: 0; border-top: 1px solid #e3e1db; } }
+.vw-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0 14px; font-variant-numeric: tabular-nums; }
+.vw-table th { text-align: left; font-weight: 600; color: #4a5257; border-bottom: 1px solid #c9ced1; padding: 3px 6px 3px 0; }
+.vw-table td { border-bottom: 1px solid #eceeef; padding: 3px 6px 3px 0; vertical-align: top; }
+.vw-table .num { white-space: nowrap; }
