@@ -496,4 +496,6 @@ Open:
 
 Decisions N8 needs: none.
 
-Next: 1.0.1 release (the two fixes); then whatever N8 finds using it.
+- 1.0.1 released (build 2880057, check green inside the script: 151 unit, 2 timing, 17 browser tests in 25.1 min). The fallback in `apps/velda-studio/index.html` moved to 2880057. In the page it loads 2880057 on the live database, with the As-built marked as the as-built.
+
+Next: whatever N8 finds using it.
