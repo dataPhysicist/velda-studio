@@ -29,6 +29,12 @@ test('opening a v0.3 scheme migrates it once and keeps the old version', async (
     await st.repo.addVersion({ id: 'old-v1', scheme_id: 'legacy', seq: 1, summary: 'Saved by v0.3', source: 'chat' }, v1)
     await st.openScheme('legacy')
     const s = st.store.getState()
+    // An old as-built keeps being the as-built after its migration version is saved.
+    await st.repo.saveScheme({ id: 'legacy-ab', name: 'As-built (old)', head_version: 'old-ab1', sort: 10 })
+    await st.repo.addVersion({ id: 'old-ab1', scheme_id: 'legacy-ab', seq: 1, summary: 'Saved by v0.3', source: 'chat' }, v1)
+    await st.openScheme('legacy-ab')
+    const asBuiltRole = (await st.repo.schemes()).find((x: any) => x.id === 'legacy-ab')?.role
+    await st.openScheme('legacy')
     const versions = await st.repo.versions('legacy')
     const old = await st.repo.model('old-v1')
     return {
@@ -40,6 +46,7 @@ test('opening a v0.3 scheme migrates it once and keeps the old version', async (
       versions: versions.map((v: any) => [v.seq, v.author ?? null, v.summary]),
       oldStillV1: old.v,
       head: s.headId === versions[versions.length - 1].id,
+      asBuiltRole,
     }
   })
   expect(result.v).toBe(2)
@@ -53,4 +60,5 @@ test('opening a v0.3 scheme migrates it once and keeps the old version', async (
   ])
   expect(result.oldStillV1).toBe(1)
   expect(result.head).toBe(true)
+  expect(result.asBuiltRole).toBe('asbuilt')
 })

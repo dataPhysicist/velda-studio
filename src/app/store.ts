@@ -234,7 +234,8 @@ export async function openScheme(id: string) {
       set({ status: 'Updating this scheme to the new model' })
       const { model: migrated, report } = migrateV1(stored, { handChecked: handCheckedWalls() })
       console.info('[studio] migrated scheme', scheme.id, report)
-      if (scheme.role == null && /^as-built/i.test(scheme.name)) await repo.saveScheme({ ...scheme, role: 'asbuilt' })
+      // The as-built is marked as such in the list the version save writes back (else the save undoes it).
+      if (scheme.role == null && /^as-built/i.test(scheme.name)) set({ schemes: get().schemes.map((x) => (x.id === scheme.id ? { ...x, role: 'asbuilt' as const } : x)) })
       await commitVersion(migrated, 'Updated to the new model (every wall and opening kept)', 'migration', { author: 'migration', parentId: headId ?? null, renderNow: false })
       set({ status: null, schemes: await repo.schemes() })
       model = migrated

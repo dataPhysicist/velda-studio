@@ -50,7 +50,7 @@ test('viewer: the share page works on its own, from jsDelivr only', async ({ pag
         asBuilt: false,
         model: proposed,
         comments: [
-          { id: 'k1', scheme_id: 's1', level: bedroom.level, at: bedroom.polygon[0].map((v, i) => v + (i ? 40 : 40)) as [number, number], body: 'Can the bed wall take a 6 ft headboard?', author: 'N8', resolved: false, created_at: '2026-10-25 20:00:00', replies: [{ body: 'Yes: 12\'-0" clear between the windows.', author: 'Designer', created_at: '2026-10-25 21:00:00' }] },
+          { id: 'k1', scheme_id: 's1', level: bedroom.level, at: bedroom.polygon[0].map((v, i) => v + (i ? 40 : 40)) as [number, number], body: 'Can the bed wall take a 6 ft headboard?', author: 'you', resolved: false, created_at: '2026-10-25 20:00:00', replies: [{ body: 'Yes: 12\'-0" clear between the windows.', author: 'Designer', created_at: '2026-10-25 21:00:00' }] },
         ],
       },
     ],
@@ -87,6 +87,7 @@ test('viewer: the share page works on its own, from jsDelivr only', async ({ pag
   await page.locator('.vw-pin').click()
   await expect(page.locator('.vw-comment.is-on')).toContainText('Can the bed wall take a 6 ft headboard?')
   await expect(page.locator('.vw-comment.is-on .vw-reply')).toContainText('12\'-0" clear between the windows.')
+  await expect(page.locator('.vw-comment.is-on .vw-meta').first()).toContainText('the owner')
   await page.screenshot({ path: `${SHOTS}/phase8-viewer-plan.jpg`, type: 'jpeg', quality: 80 })
   // The mood board: theme swatches, a stored picture as a thumbnail, a web picture as its colors and link.
   await page.getByRole('tab', { name: 'Mood boards' }).click()

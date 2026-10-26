@@ -32,6 +32,8 @@ const h = <K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, 
   return el
 }
 const ft = (v: number) => formatFeetInches(v)
+/** The studio saves its owner's notes as "you"; a reader of the share page is someone else. */
+const who = (a: string) => (a === 'you' ? 'the owner' : a)
 
 const firstLevel = (m: Model) => [...m.levels].sort((a, b) => a.elev - b.elev).find((l) => m.walls.some((w) => w.level === l.id))?.id ?? m.levels[0]?.id ?? null
 const st: State = { scheme: Math.max(0, data.schemes.findIndex((s) => !s.asBuilt)), level: null, view: 'plan', cut: true, tab: 'comments', pin: null }
@@ -247,9 +249,9 @@ function comments(s: ViewerScheme) {
         'data-id': c.id,
         onclick: () => ((st.pin = c.id), (st.level = c.level), (st.view = 'plan'), render()),
       },
-      h('div', { class: 'vw-meta' }, h('span', { class: 'vw-num' }, String(n)), `${levelName(c.level)} · ${c.author} · ${c.created_at.slice(0, 10)}${c.resolved ? ' · resolved' : ''}`),
+      h('div', { class: 'vw-meta' }, h('span', { class: 'vw-num' }, String(n)), `${levelName(c.level)} · ${who(c.author)} · ${c.created_at.slice(0, 10)}${c.resolved ? ' · resolved' : ''}`),
       h('p', {}, c.body),
-      ...c.replies.map((r) => h('div', { class: 'vw-reply' }, h('div', { class: 'vw-meta' }, `${r.author} · ${r.created_at.slice(0, 10)}`), h('p', {}, r.body))),
+      ...c.replies.map((r) => h('div', { class: 'vw-reply' }, h('div', { class: 'vw-meta' }, `${who(r.author)} · ${r.created_at.slice(0, 10)}`), h('p', {}, r.body))),
     )
   })
 }

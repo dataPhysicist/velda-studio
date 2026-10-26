@@ -1,6 +1,6 @@
 {
   "name": "velda-studio",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "Remodel design studio: one measured, editable 3D model of a home. Built on the Pascal editor, deployed as a Toolbelt app page.",
