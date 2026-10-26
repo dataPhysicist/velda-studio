@@ -238,7 +238,7 @@ var ee = (e) => {
 	let t = Math.hypot(e[0], e[1]);
 	return t < 1e-9 ? [0, 0] : [e[0] / t, e[1] / t];
 };
-function te(i, a, o) {
+function D(i, a, o) {
 	let s = a.binds[o];
 	if (!s) return null;
 	let c = ee(e(a.b, a.a));
@@ -253,24 +253,24 @@ function te(i, a, o) {
 }
 //#endregion
 //#region src/plan2d/geometry.ts
-var D = (e) => {
+var O = (e) => {
 	let t = Math.hypot(e.b[0] - e.a[0], e.b[1] - e.a[1]) || 1;
 	return [(e.b[0] - e.a[0]) / t, (e.b[1] - e.a[1]) / t];
-}, O = (e) => {
-	let t = D(e);
+}, k = (e) => {
+	let t = O(e);
 	return [t[1], -t[0]];
-}, k = (e, t) => {
-	let n = D(e);
+}, A = (e, t) => {
+	let n = O(e);
 	return [e.a[0] + n[0] * t, e.a[1] + n[1] * t];
-}, ne = (e, t) => {
-	let n = D(e);
-	return (t[0] - e.a[0]) * n[0] + (t[1] - e.a[1]) * n[1];
-}, re = (e, t) => {
+}, te = (e, t) => {
 	let n = O(e);
 	return (t[0] - e.a[0]) * n[0] + (t[1] - e.a[1]) * n[1];
-}, A = (e) => e.tMeasured ?? e.t, j = (e) => e.map((e) => `${e[0].toFixed(2)},${e[1].toFixed(2)}`).join(" ");
-function M(e) {
-	let t = O(e), n = A(e) / 2;
+}, ne = (e, t) => {
+	let n = k(e);
+	return (t[0] - e.a[0]) * n[0] + (t[1] - e.a[1]) * n[1];
+}, j = (e) => e.tMeasured ?? e.t, M = (e) => e.map((e) => `${e[0].toFixed(2)},${e[1].toFixed(2)}`).join(" ");
+function N(e) {
+	let t = k(e), n = j(e) / 2;
 	return [
 		[e.a[0] + t[0] * n, e.a[1] + t[1] * n],
 		[e.b[0] + t[0] * n, e.b[1] + t[1] * n],
@@ -278,15 +278,15 @@ function M(e) {
 		[e.a[0] - t[0] * n, e.a[1] - t[1] * n]
 	];
 }
-function ie(e, t) {
-	let n = A(t) / 2 + .4, r = O(t), i = D(t), a = k(t, e.at - e.w / 2), o = k(t, e.at + e.w / 2), s = (e, t) => [e[0] + r[0] * t, e[1] + r[1] * t], c = [
+function re(e, t) {
+	let n = j(t) / 2 + .4, r = k(t), i = O(t), a = A(t, e.at - e.w / 2), o = A(t, e.at + e.w / 2), s = (e, t) => [e[0] + r[0] * t, e[1] + r[1] * t], c = [
 		s(a, n),
 		s(o, n),
 		s(o, -n),
 		s(a, -n)
 	];
 	if (e.kind === "window") {
-		let e = A(t) / 2;
+		let e = j(t) / 2;
 		return {
 			gap: c,
 			lines: [
@@ -302,15 +302,15 @@ function ie(e, t) {
 		dashed: [[s(a, n), s(a, -n)], [s(o, n), s(o, -n)]]
 	};
 	if (e.style === "sliding" || e.style === "pocket" || e.style === "barn") {
-		let n = Math.max(.75, A(t) * .22), r = k(t, e.at);
+		let n = Math.max(.75, j(t) * .22), r = A(t, e.at);
 		return {
 			gap: c,
-			lines: e.style === "pocket" ? [[s(a, 0), s(r, 0)]] : [[s(a, n), s(k(t, e.at + e.w * .05), n)], [s(k(t, e.at - e.w * .05), -n), s(o, -n)]]
+			lines: e.style === "pocket" ? [[s(a, 0), s(r, 0)]] : [[s(a, n), s(A(t, e.at + e.w * .05), n)], [s(A(t, e.at - e.w * .05), -n), s(o, -n)]]
 		};
 	}
 	let l = e.swing?.side === "right" ? -1 : 1;
 	if (e.style === "french" || e.swing && e.w >= 60 && e.style !== "swing") {
-		let i = e.w / 2, u = s(a, l * (n - .4)), d = s(o, l * (n - .4)), f = [u[0] + r[0] * l * i, u[1] + r[1] * l * i], p = [d[0] + r[0] * l * i, d[1] + r[1] * l * i], m = s(k(t, e.at), l * (n - .4)), h = l > 0 ? 0 : 1;
+		let i = e.w / 2, u = s(a, l * (n - .4)), d = s(o, l * (n - .4)), f = [u[0] + r[0] * l * i, u[1] + r[1] * l * i], p = [d[0] + r[0] * l * i, d[1] + r[1] * l * i], m = s(A(t, e.at), l * (n - .4)), h = l > 0 ? 0 : 1;
 		return {
 			gap: c,
 			lines: [[u, f], [d, p]],
@@ -324,23 +324,23 @@ function ie(e, t) {
 		arc: `M ${m[0]} ${m[1]} A ${e.w} ${e.w} 0 0 ${g > 0 ? 0 : 1} ${h[0]} ${h[1]}`
 	};
 }
-function ae(e) {
+function ie(e) {
 	return {
 		at: e.polygon.length >= 3 ? v(e.polygon, 2) : e.labelAt ?? [0, 0],
 		name: e.name,
 		area: `${Math.round(h(e.polygon) / 144)} sf`
 	};
 }
-var N = (e) => e ? E([w(e.prov.a), w(e.prov.b)]) : "assumed";
-function P(e, t, n, r) {
+var P = (e) => e ? E([w(e.prov.a), w(e.prov.b)]) : "assumed";
+function F(e, t, n, r) {
 	let i = [(n[0] + r[0]) / 2, (n[1] + r[1]) / 2], a = r[0] - n[0], o = r[1] - n[1], s = Math.hypot(a, o) || 1, l;
 	for (let n of e.walls) {
 		if (n.level !== t) continue;
-		let e = D(n);
+		let e = O(n);
 		if (Math.abs(e[0] * o / s - e[1] * a / s) > .05) continue;
-		let r = ne(n, i);
+		let r = te(n, i);
 		if (r < -1 || r > c(n) + 1) continue;
-		let u = Math.abs(Math.abs(re(n, i)) - A(n) / 2);
+		let u = Math.abs(Math.abs(ne(n, i)) - j(n) / 2);
 		u <= 1.5 && (!l || u < l.d) && (l = {
 			w: n,
 			d: u
@@ -348,7 +348,7 @@ function P(e, t, n, r) {
 	}
 	return l?.w;
 }
-function oe(e, t) {
+function ae(e, t) {
 	let n = t.polygon, r = [];
 	if (n.length < 3) return r;
 	let i = 0;
@@ -360,7 +360,7 @@ function oe(e, t) {
 	for (let i = 0; i < n.length; i++) {
 		let o = n[i], s = n[(i + 1) % n.length], c = Math.hypot(s[0] - o[0], s[1] - o[1]);
 		if (c < 30) continue;
-		let l = n[(i - 1 + n.length) % n.length], u = n[(i + 2) % n.length], d = P(e, t.level, l, o), f = P(e, t.level, s, u), p = E([N(d), N(f)]), m = [(o[0] + s[0]) / 2, (o[1] + s[1]) / 2], h = -(s[1] - o[1]) / c, g = (s[0] - o[0]) / c, _ = a, v = [m[0] + h * _ * 9, m[1] + g * _ * 9];
+		let l = n[(i - 1 + n.length) % n.length], u = n[(i + 2) % n.length], d = F(e, t.level, l, o), f = F(e, t.level, s, u), p = E([P(d), P(f)]), m = [(o[0] + s[0]) / 2, (o[1] + s[1]) / 2], h = -(s[1] - o[1]) / c, g = (s[0] - o[0]) / c, _ = a, v = [m[0] + h * _ * 9, m[1] + g * _ * 9];
 		r.push({
 			a: o,
 			b: s,
@@ -373,10 +373,10 @@ function oe(e, t) {
 	}
 	return r;
 }
-function se(e, t) {
+function oe(e, t) {
 	let n = e.walls.filter((e) => e.level === t && e.exterior), r = n.length ? n : e.walls.filter((e) => e.level === t);
 	if (!r.length) return null;
-	let i = g(r.flatMap((e) => M(e)));
+	let i = g(r.flatMap((e) => N(e)));
 	return {
 		x0: i.x0,
 		y0: i.y0,
@@ -384,12 +384,12 @@ function se(e, t) {
 		y1: i.y1
 	};
 }
-function ce(e, t) {
+function se(e, t) {
 	if (t.status !== "conflict") return {
 		text: t.text,
 		title: t.text
 	};
-	let n = te(e, t, 0), r = te(e, t, 1), i = n !== null && r !== null ? C(Math.abs(r - n)) : null, a = t.source === "sheet" ? "drawn" : "measured";
+	let n = D(e, t, 0), r = D(e, t, 1), i = n !== null && r !== null ? C(Math.abs(r - n)) : null, a = t.source === "sheet" ? "drawn" : "measured";
 	return {
 		text: i ? `${t.text} ${a}, ${i} now` : t.text,
 		title: i ? `The ${t.source === "sheet" ? "drawing says" : "tape measured"} ${t.text}; the walls measure ${i} now.` : t.text
@@ -397,22 +397,22 @@ function ce(e, t) {
 }
 //#endregion
 //#region src/export/plan-svg.ts
-var F = {
+var I = {
 	measured: "#23282c",
 	traced: "#a5670f",
 	assumed: "#8a9297",
 	velda: "#2f5f9e",
 	conflict: "#9a3b2e"
-}, le = {
+}, ce = {
 	measured: "measured (from the drawing or the field)",
 	traced: "traced from the drawing, no dimension string",
 	assumed: "assumed (a default)",
 	velda: "set by Velda",
 	conflict: "drawing and model disagree"
-}, I = (e) => e.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"), L = (e) => (Math.round(e * 100) / 100).toString(), R = (e) => C(e);
+}, le = (e) => e.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"), L = (e) => (Math.round(e * 100) / 100).toString(), R = (e) => C(e);
 function ue(e, t, n = 48) {
 	let r = [
-		...e.walls.filter((e) => e.level === t).flatMap((e) => M(e)),
+		...e.walls.filter((e) => e.level === t).flatMap((e) => N(e)),
 		...e.rooms.filter((e) => e.level === t).flatMap((e) => e.polygon),
 		...e.stairs.filter((e) => e.level === t || e.toLevel === t).flatMap((e) => e.polygon)
 	];
@@ -431,26 +431,26 @@ function ue(e, t, n = 48) {
 	};
 }
 function de(e, t) {
-	let n = t.level, r = t.text ?? 6, i = ue(e, n, t.margin ?? 54), a = i.x1 - i.x0, o = i.y1 - i.y0, s = [], c = (e, t, n, r, i) => `<line x1="${L(e[0])}" y1="${L(e[1])}" x2="${L(t[0])}" y2="${L(t[1])}" stroke="${n}" stroke-width="${r}"${i ? ` stroke-dasharray="${i}"` : ""}/>`, l = (e, t, n, r, i = {}) => `<text x="${L(e[0])}" y="${L(e[1])}" font-family="helvetica" font-size="${L(n)}" fill="${r}" text-anchor="${i.anchor ?? "middle"}"${i.weight ? ` font-weight="${i.weight}"` : ""}${i.rotate ? ` transform="rotate(-90 ${L(e[0])} ${L(e[1])})"` : ""}>${I(t)}</text>`, u = e.walls.filter((e) => e.level === n), d = e.rooms.filter((e) => e.level === n && e.polygon.length >= 3), f = t.base ? S(t.base, e) : null, p = new Set(f?.walls.added.map((e) => e.id) ?? []);
-	for (let e of d) s.push(`<polygon points="${j(e.polygon)}" fill="${e.flags.includes("needs_confirming") ? "#f6e9f2" : "#ffffff"}" stroke="none"/>`);
+	let n = t.level, r = t.text ?? 6, i = ue(e, n, t.margin ?? 54), a = i.x1 - i.x0, o = i.y1 - i.y0, s = [], c = (e, t, n, r, i) => `<line x1="${L(e[0])}" y1="${L(e[1])}" x2="${L(t[0])}" y2="${L(t[1])}" stroke="${n}" stroke-width="${r}"${i ? ` stroke-dasharray="${i}"` : ""}/>`, l = (e, t, n, r, i = {}) => `<text x="${L(e[0])}" y="${L(e[1])}" font-family="helvetica" font-size="${L(n)}" fill="${r}" text-anchor="${i.anchor ?? "middle"}"${i.weight ? ` font-weight="${i.weight}"` : ""}${i.rotate ? ` transform="rotate(-90 ${L(e[0])} ${L(e[1])})"` : ""}>${le(t)}</text>`, u = e.walls.filter((e) => e.level === n), d = e.rooms.filter((e) => e.level === n && e.polygon.length >= 3), f = t.base ? S(t.base, e) : null, p = new Set(f?.walls.added.map((e) => e.id) ?? []);
+	for (let e of d) s.push(`<polygon points="${M(e.polygon)}" fill="${e.flags.includes("needs_confirming") ? "#f6e9f2" : "#ffffff"}" stroke="none"/>`);
 	if (t.items !== !1) for (let t of e.items.filter((e) => e.level === n)) {
 		let e = (t.label || t.kind.replace(/_/g, " ")).split(/,\s/)[0], n = Math.min(r * .75, Math.max(2.5, Math.min(t.w, t.d) * .28));
-		s.push(`<g transform="translate(${L(t.x)} ${L(t.y)}) rotate(${L(-t.rot)})"><title>${I(`${e}, ${R(t.w)} x ${R(t.d)}`)}</title><rect x="${L(-t.w / 2)}" y="${L(-t.d / 2)}" width="${L(t.w)}" height="${L(t.d)}" fill="#ffffff" stroke="#737d83" stroke-width="0.6"/>${t.w >= 14 && t.d >= 8 && e.length * n * .55 < t.w ? l([0, n * .35], e, n, "#4a5257") : ""}</g>`);
+		s.push(`<g transform="translate(${L(t.x)} ${L(t.y)}) rotate(${L(-t.rot)})"><title>${le(`${e}, ${R(t.w)} x ${R(t.d)}`)}</title><rect x="${L(-t.w / 2)}" y="${L(-t.d / 2)}" width="${L(t.w)}" height="${L(t.d)}" fill="#ffffff" stroke="#737d83" stroke-width="0.6"/>${t.w >= 14 && t.d >= 8 && e.length * n * .55 < t.w ? l([0, n * .35], e, n, "#4a5257") : ""}</g>`);
 	}
 	for (let e of u) {
 		let t = e.kind === "glass" ? "#8fb3bb" : e.kind === "half" ? "#8a9297" : e.kind === "rail" ? "#ffffff" : e.exterior ? "#23282c" : "#4a5257", n = p.has(e.id) ? " stroke=\"#9a3b2e\" stroke-width=\"1.2\"" : e.kind === "rail" ? " stroke=\"#23282c\" stroke-width=\"0.6\"" : "";
-		s.push(`<polygon points="${j(M(e))}" fill="${t}"${n}/>`);
+		s.push(`<polygon points="${M(N(e))}" fill="${t}"${n}/>`);
 	}
 	if (t.base) for (let e of f.walls.removed.map((e) => e.id)) {
 		let r = t.base.walls.find((t) => t.id === e);
-		r && r.level === n && s.push(`<polygon points="${j(M(r))}" fill="none" stroke="#9a3b2e" stroke-width="1" stroke-dasharray="4 3"/>`);
+		r && r.level === n && s.push(`<polygon points="${M(N(r))}" fill="none" stroke="#9a3b2e" stroke-width="1" stroke-dasharray="4 3"/>`);
 	}
 	let m = new Map(u.map((e) => [e.id, e]));
 	for (let t of e.openings) {
 		let e = m.get(t.wall);
 		if (!e) continue;
-		let n = ie(t, e);
-		s.push(`<polygon points="${j(n.gap)}" fill="#ffffff"/>`);
+		let n = re(t, e);
+		s.push(`<polygon points="${M(n.gap)}" fill="#ffffff"/>`);
 		for (let [e, r] of n.lines) s.push(c(e, r, "#23282c", t.kind === "window" ? .6 : .8));
 		for (let [e, t] of n.dashed ?? []) s.push(c(e, t, "#23282c", .6, "2 2"));
 		n.arc && s.push(`<path d="${n.arc}" fill="none" stroke="#23282c" stroke-width="0.5" stroke-dasharray="3 2"/>`);
@@ -462,23 +462,23 @@ function de(e, t) {
 		s.push(c(a, o, "#9a3b2e", 1)), s.push(`<circle cx="${L(o[0])}" cy="${L(o[1])}" r="1.6" fill="#9a3b2e"/>`), s.push(l([o[0], o[1] - 3], `moved ${R(e.move)}`, r * .75, "#9a3b2e"));
 	}
 	for (let t of e.stairs.filter((e) => e.level === n || e.toLevel === n)) {
-		s.push(`<polygon points="${j(t.polygon)}" fill="none" stroke="#4a5257" stroke-width="0.6" stroke-dasharray="6 3"/>`);
+		s.push(`<polygon points="${M(t.polygon)}" fill="none" stroke="#4a5257" stroke-width="0.6" stroke-dasharray="6 3"/>`);
 		let e = g(t.polygon), i = [(e.x0 + e.x1) / 2, (e.y0 + e.y1) / 2], a = Math.min(e.x1 - e.x0, e.y1 - e.y0) * .6 + Math.abs(t.up[0] * (e.x1 - e.x0) + t.up[1] * (e.y1 - e.y0)) * .3, o = [i[0] + t.up[0] * a * .5, i[1] + t.up[1] * a * .5];
 		s.push(c([i[0] - t.up[0] * a * .5, i[1] - t.up[1] * a * .5], o, "#4a5257", .6)), s.push(l([i[0], i[1] + r * .3], t.level === n ? "UP" : "DN", r * .7, "#4a5257"));
 	}
 	for (let t of e.dimensions.filter((e) => e.level === n)) {
 		if (!(t.source === "sheet" && t.status === "ok" || t.source === "user" || t.source === "field" || t.status === "conflict")) continue;
-		let n = t.status === "conflict" ? F.conflict : t.source === "sheet" ? "#a9b0b4" : F.measured, i = [(t.a[0] + t.b[0]) / 2, (t.a[1] + t.b[1]) / 2], a = Math.abs(t.b[1] - t.a[1]) > Math.abs(t.b[0] - t.a[0]);
-		s.push(c(t.a, t.b, n, .4)), s.push(l(a ? [i[0] - 1.5, i[1]] : [i[0], i[1] - 1.5], ce(e, t).text, r * .62, n, { rotate: a }));
+		let n = t.status === "conflict" ? I.conflict : t.source === "sheet" ? "#a9b0b4" : I.measured, i = [(t.a[0] + t.b[0]) / 2, (t.a[1] + t.b[1]) / 2], a = Math.abs(t.b[1] - t.a[1]) > Math.abs(t.b[0] - t.a[0]);
+		s.push(c(t.a, t.b, n, .4)), s.push(l(a ? [i[0] - 1.5, i[1]] : [i[0], i[1] - 1.5], se(e, t).text, r * .62, n, { rotate: a }));
 	}
-	for (let t of d) for (let n of oe(e, t)) s.push(l(n.at, n.text, r * .7, F[n.badge], { rotate: n.vertical }));
-	let h = se(e, n);
+	for (let t of d) for (let n of ae(e, t)) s.push(l(n.at, n.text, r * .7, I[n.badge], { rotate: n.vertical }));
+	let h = oe(e, n);
 	if (h) {
 		let e = h.y0 - 22, t = h.x0 - 22;
 		s.push(c([h.x0, e], [h.x1, e], "#23282c", .5), c([h.x0, e - 4], [h.x0, e + 4], "#23282c", .5), c([h.x1, e - 4], [h.x1, e + 4], "#23282c", .5)), s.push(l([(h.x0 + h.x1) / 2, e - 3], R(h.x1 - h.x0), r * .8, "#23282c")), s.push(c([t, h.y0], [t, h.y1], "#23282c", .5), c([t - 4, h.y0], [t + 4, h.y0], "#23282c", .5), c([t - 4, h.y1], [t + 4, h.y1], "#23282c", .5)), s.push(l([t - 3, (h.y0 + h.y1) / 2], R(h.y1 - h.y0), r * .8, "#23282c", { rotate: !0 }));
 	}
 	for (let e of d) {
-		let t = ae(e);
+		let t = ie(e);
 		s.push(l(t.at, t.name, r, "#23282c", { weight: "bold" })), s.push(l([t.at[0], t.at[1] + r * 1.15], t.area, r * .75, "#4a5257"));
 	}
 	if (e.project.north !== null && e.project.north !== void 0) {
@@ -1081,7 +1081,7 @@ var q = (e, t = {}, ...n) => {
 	for (let [e, n] of Object.entries(t)) n != null && n !== !1 && (e.startsWith("on") && typeof n == "function" ? r.addEventListener(e.slice(2).toLowerCase(), n) : e === "class" ? r.className = n : r.setAttribute(e, n === !0 ? "" : String(n)));
 	for (let e of n) e != null && e !== !1 && r.append(e);
 	return r;
-}, De = (e) => C(e), J = (e) => [...e.levels].sort((e, t) => e.elev - t.elev).find((t) => e.walls.some((e) => e.level === t.id))?.id ?? e.levels[0]?.id ?? null, Y = {
+}, De = (e) => C(e), Oe = (e) => e === "you" ? "the owner" : e, J = (e) => [...e.levels].sort((e, t) => e.elev - t.elev).find((t) => e.walls.some((e) => e.level === t.id))?.id ?? e.levels[0]?.id ?? null, Y = {
 	scheme: Math.max(0, K.schemes.findIndex((e) => !e.asBuilt)),
 	level: null,
 	view: "plan",
@@ -1097,9 +1097,9 @@ var X = () => K.schemes[Y.scheme], Z = {
 };
 window.__viewer = Z;
 function Q() {
-	Te.replaceChildren(Oe(), q("div", { class: "vw-body" }, ke(), Ne())), Z.view = Y.view, Z.level = Y.level;
+	Te.replaceChildren(ke(), q("div", { class: "vw-body" }, Ae(), Pe())), Z.view = Y.view, Z.level = Y.level;
 }
-function Oe() {
+function ke() {
 	let e = X(), t = [...e.model.levels].sort((e, t) => e.elev - t.elev).filter((t) => e.model.walls.some((e) => e.level === t.id));
 	return q("header", { class: "vw-head" }, q("div", { class: "vw-title" }, q("strong", {}, K.project.name), K.project.address ? q("span", { class: "muted" }, K.project.address) : null), K.schemes.length > 1 ? q("label", { class: "vw-scheme" }, "Scheme ", (() => {
 		let e = q("select", {
@@ -1134,11 +1134,11 @@ function Oe() {
 		onclick: () => (Y.cut = !Y.cut, Q())
 	}, Y.cut ? "Walls cut away" : "Walls full height") : null));
 }
-function ke() {
+function Ae() {
 	let e = q("main", { class: "vw-stage" });
-	return Y.view === "plan" ? Ae(e) : Me(e), e.append(q("p", { class: "vw-intent" }, K.intent)), e;
+	return Y.view === "plan" ? je(e) : Ne(e), e.append(q("p", { class: "vw-intent" }, K.intent)), e;
 }
-function Ae(e) {
+function je(e) {
 	let t = X(), n = Y.level ?? J(t.model);
 	if (!n) return;
 	let r = de(t.model, {
@@ -1190,9 +1190,9 @@ function Ae(e) {
 			c.vb[2],
 			c.vb[3]
 		], s();
-	}), i.addEventListener("pointerup", () => c = null), e.append(i, je());
+	}), i.addEventListener("pointerup", () => c = null), e.append(i, Me());
 }
-function je() {
+function Me() {
 	return q("ul", {
 		class: "vw-legend",
 		"aria-label": "Where the numbers came from"
@@ -1204,11 +1204,11 @@ function je() {
 		"conflict"
 	].map((e) => q("li", {}, q("span", {
 		class: "sw",
-		style: `background:${F[e]}`
-	}), le[e])));
+		style: `background:${I[e]}`
+	}), ce[e])));
 }
 var $ = null;
-async function Me(e) {
+async function Ne(e) {
 	let t = q("div", { class: "vw-3d" }, q("p", { class: "muted" }, "Loading the 3D view..."));
 	e.append(t);
 	try {
@@ -1239,7 +1239,7 @@ async function Me(e) {
 		t.replaceChildren(q("p", { class: "muted" }, `The 3D view needs a connection to cdn.jsdelivr.net (${String(e).slice(0, 80)}).`));
 	}
 }
-function Ne() {
+function Pe() {
 	let e = X(), t = q("div", {
 		class: "vw-tabs",
 		role: "tablist"
@@ -1253,9 +1253,9 @@ function Ne() {
 		"aria-selected": Y.tab === e,
 		onclick: () => (Y.tab = e, Q())
 	}, t))), n = q("div", { class: "vw-panel" });
-	return Y.tab === "comments" ? n.append(...Pe(e)) : Y.tab === "sizes" ? n.append(...Ie(e.model)) : Y.tab === "mood" ? n.append(...Le(e.model)) : n.append(...Be(e)), q("aside", { class: "vw-side" }, t, n);
+	return Y.tab === "comments" ? n.append(...Fe(e)) : Y.tab === "sizes" ? n.append(...Le(e.model)) : Y.tab === "mood" ? n.append(...Re(e.model)) : n.append(...Ve(e)), q("aside", { class: "vw-side" }, t, n);
 }
-function Pe(e) {
+function Fe(e) {
 	if (!e.comments.length) return [q("p", { class: "muted" }, "No comments on this scheme.")];
 	let t = (t) => e.model.levels.find((e) => e.id === t)?.name ?? t, n = /* @__PURE__ */ new Map();
 	return e.comments.map((e) => {
@@ -1264,10 +1264,10 @@ function Pe(e) {
 			class: `vw-comment${Y.pin === e.id ? " is-on" : ""}${e.resolved ? " is-resolved" : ""}`,
 			"data-id": e.id,
 			onclick: () => (Y.pin = e.id, Y.level = e.level, Y.view = "plan", Q())
-		}, q("div", { class: "vw-meta" }, q("span", { class: "vw-num" }, String(r)), `${t(e.level)} · ${e.author} · ${e.created_at.slice(0, 10)}${e.resolved ? " · resolved" : ""}`), q("p", {}, e.body), ...e.replies.map((e) => q("div", { class: "vw-reply" }, q("div", { class: "vw-meta" }, `${e.author} · ${e.created_at.slice(0, 10)}`), q("p", {}, e.body))));
+		}, q("div", { class: "vw-meta" }, q("span", { class: "vw-num" }, String(r)), `${t(e.level)} · ${Oe(e.author)} · ${e.created_at.slice(0, 10)}${e.resolved ? " · resolved" : ""}`), q("p", {}, e.body), ...e.replies.map((e) => q("div", { class: "vw-reply" }, q("div", { class: "vw-meta" }, `${Oe(e.author)} · ${e.created_at.slice(0, 10)}`), q("p", {}, e.body))));
 	});
 }
-var Fe = {
+var Ie = {
 	rooms: [
 		"name",
 		"width_in",
@@ -1299,12 +1299,12 @@ var Fe = {
 		"vendor"
 	]
 };
-function Ie(e) {
+function Le(e) {
 	let t = e.levels.find((e) => e.id === Y.level)?.name, n = [q("p", { class: "muted" }, `${t ?? "Every level"}. Rooms are wall to wall; heights are from the floor.`)];
 	for (let r of ge(e)) {
 		let e = r.rows.filter((e) => !t || e.level === t);
 		if (!e.length) continue;
-		let i = r.cols.filter((e) => Fe[r.name]?.includes(e.key)), a = (e, t, n) => {
+		let i = r.cols.filter((e) => Ie[r.name]?.includes(e.key)), a = (e, t, n) => {
 			let r = _e(e, t, n);
 			return t.key === "vendor" && n.link ? q("a", {
 				href: String(n.link),
@@ -1316,11 +1316,11 @@ function Ie(e) {
 	}
 	return n;
 }
-function Le(e) {
+function Re(e) {
 	let t = e.rooms.filter((t) => t.polygon.length >= 3 && (t.theme || e.inspiration.some((e) => e.rooms.includes(t.id))));
-	return t.length ? t.map((t) => Re(e, t)) : [q("p", { class: "muted" }, "No mood boards yet: no room has a theme or inspiration in this scheme.")];
+	return t.length ? t.map((t) => ze(e, t)) : [q("p", { class: "muted" }, "No mood boards yet: no room has a theme or inspiration in this scheme.")];
 }
-function Re(e, t) {
+function ze(e, t) {
 	let n = t.theme && e.themes[t.theme] || (e.theme ? e.themes[e.theme] : null), r = g(t.polygon), i = e.inspiration.filter((e) => e.rooms.includes(t.id) && e.kind !== "board").slice(0, 12), a = [];
 	if (n) for (let e of ve) {
 		let t = W(n, e), r = xe(n, e);
@@ -1331,9 +1331,9 @@ function Re(e, t) {
 			style: `background:${i}`
 		}), q("strong", {}, e), ` ${t?.name ?? ""} `, q("code", {}, i)));
 	}
-	return q("section", { class: "vw-mood" }, q("h3", {}, t.name), q("p", { class: "muted" }, `${De(r.x1 - r.x0)} x ${De(r.y1 - r.y0)}, ${Math.round(h(t.polygon) / 144)} sf`), n ? q("p", {}, q("strong", {}, n.name), n.data.description ? ` ${n.data.description}` : "") : null, a.length ? q("ul", { class: "vw-sw" }, ...a) : null, n?.data.materials?.length ? q("ul", { class: "vw-mat" }, ...n.data.materials.map((e) => q("li", {}, q("strong", {}, e.category), ` ${e.choice}`))) : null, i.length ? q("ul", { class: "vw-pics" }, ...i.map(ze)) : null);
+	return q("section", { class: "vw-mood" }, q("h3", {}, t.name), q("p", { class: "muted" }, `${De(r.x1 - r.x0)} x ${De(r.y1 - r.y0)}, ${Math.round(h(t.polygon) / 144)} sf`), n ? q("p", {}, q("strong", {}, n.name), n.data.description ? ` ${n.data.description}` : "") : null, a.length ? q("ul", { class: "vw-sw" }, ...a) : null, n?.data.materials?.length ? q("ul", { class: "vw-mat" }, ...n.data.materials.map((e) => q("li", {}, q("strong", {}, e.category), ` ${e.choice}`))) : null, i.length ? q("ul", { class: "vw-pics" }, ...i.map(Be)) : null);
 }
-function ze(e) {
+function Be(e) {
 	let t = K.thumbs[e.id], n = e.url ?? (e.image && /^https?:/.test(e.image) ? e.image : void 0), r = (e.tags.palette.length ? e.tags.palette : e.sampled ?? []).slice(0, 5);
 	return q("li", {}, t ? q("img", {
 		src: t,
@@ -1348,7 +1348,7 @@ function ze(e) {
 		rel: "noreferrer noopener"
 	}, e.source ?? "link") : null);
 }
-function Be(e) {
+function Ve(e) {
 	return [
 		q("p", {}, q("strong", {}, e.name), e.asBuilt ? " (the house as it is today)" : ""),
 		q("p", { class: "muted" }, `${e.version}, ${e.date}`),
