@@ -105,6 +105,9 @@ Where Playwright's Chromium download is blocked (this build sandbox), set `PW_CH
 - 2026-10-25 The timing budgets run in `npm run test:perf`, on their own inside `npm run check`, because with every test file running at once the GitHub runner timed clear dimensions at 27 ms; alone they take 12.5 ms.
 - 2026-10-25 A room's sizes find the inside of each edge from the way its outline winds, not from one point inside it (12.5 ms to 2.8 ms for the whole house, and right on the inner edges of an L-shaped room).
 - 2026-10-25 A render names the room it is for in the camera words when that room is in the picture.
+- 2026-10-26 1.0: N8 said go. Before the switch, the live tables were copied inside `velda_studio.duckdb` as `backup_20261026_*` (schemes, versions, themes, settings, projects, and the empty messages, blobs, blob_parts and captures); the versions' content hash matched the live table. Release builds now save to `velda_studio.duckdb`; a test-copy build sets `STUDIO_DB=velda_studio_dev.duckdb`.
+- 2026-10-26 The first open of an old as-built marked it as the as-built and the migration's version save then wrote the old record back without the mark. Fixed in 1.0.1; the live As-built (A1 + A2) was marked by hand (the page already treated it as the as-built by its name).
+- 2026-10-26 The share page shows the studio owner's notes as "the owner" (the studio saves them as "you").
 
 ## 2026-10-18  Phase 0  commit eaa8f33 (dev release, build 5f119ff)
 
@@ -439,3 +442,58 @@ Open:
 Decisions N8 needs: the go for 1.0 (the live database).
 
 Next: on N8's go, back up the live tables, release 1.0.0 on `velda_studio.duckdb`, open the page once so the live schemes upgrade, check the As-built head still has 108 walls and 51 openings, and move the fallback. Then the in-page checks when the browser link is back.
+
+## 2026-10-26  1.0.0  build 94a3cf9 (live), then 1.0.1
+
+Done:
+- Released 1.0.0 with `scripts/release.sh` on `velda_studio.duckdb`: version 1.0.0, `release.json` and `toolbelt/index.html` point at 94a3cf9, and the fallback in `apps/velda-studio/index.html` in Velda storage moved from c2fffca (the v0.3 build) to 94a3cf9.
+- The one-time upgrade of the live schemes: the page opened each of the five once.
+- In-page checks with the built-in browser on N8's Mac (it came back online), first on the test copy with build 1b54a6c, then on the live database with 94a3cf9.
+- 1.0.1 fixes two things those checks found (decisions above).
+
+Evidence:
+- `npm run check` green inside `scripts/release.sh` for 1.0.0: 151 unit tests in 20 files, 2 timing tests, 17 browser tests (25.7 min).
+- Live database before: 5 schemes, 8 versions, every head on model v1.
+
+  | Scheme | Walls | Openings | Fixtures |
+  |---|---|---|---|
+  | As-built (A1 + A2) | 108 | 51 | 4 |
+  | Designs Unlimited 7.2.26 (A4 + A5) | 125 | 50 | 17 |
+  | N8 kitchen | 125 | 50 | 17 |
+  | Velda primary bath concept | 108 | 51 | 5 |
+  | N8 primary bath | 108 | 51 | 5 |
+
+- Live database after opening each scheme in the 1.0 page:
+  - 13 versions: the 8 old ones untouched, plus one "Updated to the new model (every wall and opening kept)" by migration per scheme.
+  - Every scheme's walls, openings and fixtures are the same counts as before.
+  - `schema_version` is 2.
+  - The backup tables are still there with 8 versions.
+  - The page shows no "Test copy" note.
+- Phase 7 in the page (test copy, "Warm oak and marble bath theme", 3D view of the Primary Bathroom), "Render the primary bath realistically from this view":
+  - 58 s from asking to the picture.
+  - `google/nano-banana-2` at 1K, 4:5, Replicate run time 16 s (prediction 2mbjzexy85rmy0d1f0avx663wc), about $0.07.
+  - Four inspiration pictures as references.
+  - Camera words "above the Primary Bathroom ... toward the top wall, with 6'-0" double vanity and a window".
+  - The before and after slider with "Mood, not dimensions".
+  - Files `velda-studio/renders/r7g1b03ha1-view.png` and `r7g1b03ha1.jpg`; screenshot `docs/buildlog/phase7-page-render.jpg`.
+- Phase 8 in the page (test copy):
+  - Build package: a 123 KB zip with 15 files, every one non-zero. The files are README.md, the sheet set (55 KB), two DXF files (67 and 69 KB), model.json (114 KB), as-built.json (108 KB), model-v2.schema.json (20 KB), model.glb (288 KB), four schedules, changes.md, changes.csv and inspiration/index.md. Screenshot `phase8-page-export.jpg`.
+  - Share, with a test note pinned on the Primary Bedroom: a 30-day link to `velda-studio/shares/shmvp7lavi.html` (150 KB) through `manage_shared_artifacts`. Opened in a fresh tab with no Toolbelt session, it showed:
+    - the plan with its one comment pin and the note
+    - the Sizes tab with the four tables (the double vanity 6'-0" x 1'-10")
+    - the mood board with the theme's colors and materials
+    - 3D with 112 meshes
+    - Screenshot `phase8-page-share-3d.jpg`.
+- Phase 9 in the page:
+  - The tour from Settings: step 1's card sits in the left column beside the plan. Clicking the Primary Bedroom moved it to step 2, with "Make the Primary Bedroom 1'-0" bigger" in the chat box and the card above it.
+  - Ended without sending.
+  - Screenshots `phase9-page-tour-1.jpg`, `phase9-page-tour-2.jpg`.
+
+Open:
+- N8 opening the share link in a private window (Phase 8 DoD): the link was sent to him.
+- The DU sheets A1, A4 and A5 for success criterion 1.
+- A `v1.0.0` git tag: the build sandbox may not push tags (the proxy refused it). The release commit is 94a3cf9.
+
+Decisions N8 needs: none.
+
+Next: 1.0.1 release (the two fixes); then whatever N8 finds using it.
