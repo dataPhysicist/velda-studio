@@ -351,11 +351,16 @@ function P(e, t, n, r) {
 function oe(e, t) {
 	let n = t.polygon, r = [];
 	if (n.length < 3) return r;
-	let i = v(n, 2);
-	for (let a = 0; a < n.length; a++) {
-		let o = n[a], s = n[(a + 1) % n.length], c = Math.hypot(s[0] - o[0], s[1] - o[1]);
+	let i = 0;
+	for (let e = 0; e < n.length; e++) {
+		let t = n[e], r = n[(e + 1) % n.length];
+		i += t[0] * r[1] - r[0] * t[1];
+	}
+	let a = i > 0 ? 1 : -1;
+	for (let i = 0; i < n.length; i++) {
+		let o = n[i], s = n[(i + 1) % n.length], c = Math.hypot(s[0] - o[0], s[1] - o[1]);
 		if (c < 30) continue;
-		let l = n[(a - 1 + n.length) % n.length], u = n[(a + 2) % n.length], d = P(e, t.level, l, o), f = P(e, t.level, s, u), p = E([N(d), N(f)]), m = [(o[0] + s[0]) / 2, (o[1] + s[1]) / 2], h = -(s[1] - o[1]) / c, g = (s[0] - o[0]) / c, _ = (i[0] - m[0]) * h + (i[1] - m[1]) * g > 0 ? 1 : -1, v = [m[0] + h * _ * 9, m[1] + g * _ * 9];
+		let l = n[(i - 1 + n.length) % n.length], u = n[(i + 2) % n.length], d = P(e, t.level, l, o), f = P(e, t.level, s, u), p = E([N(d), N(f)]), m = [(o[0] + s[0]) / 2, (o[1] + s[1]) / 2], h = -(s[1] - o[1]) / c, g = (s[0] - o[0]) / c, _ = a, v = [m[0] + h * _ * 9, m[1] + g * _ * 9];
 		r.push({
 			a: o,
 			b: s,
