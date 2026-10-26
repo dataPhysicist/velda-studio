@@ -5,15 +5,15 @@
 #   <asset-ref-sha>  a commit that contains the current assets/ folder (jsDelivr serves assets from it)
 #
 # Environment:
-#   STUDIO_DB        workspace database the build saves to. Default velda_studio_dev.duckdb (the test
-#                    copy). Only the 1.0 release sets STUDIO_DB=velda_studio.duckdb.
+#   STUDIO_DB        workspace database the build saves to. Default velda_studio.duckdb (the live
+#                    schemes, since 1.0); STUDIO_DB=velda_studio_dev.duckdb makes a test-copy build.
 #   RELEASE_TRAILER  optional lines appended to each commit message (attribution); none by default.
 #   SKIP_CHECK=1     skip npm run check (never for a real release; for re-pointing an existing build).
 #   PW_CHROMIUM_PATH Chromium for the browser tests where Playwright's download is blocked.
 set -euo pipefail
 ASSET_REF="${1:?usage: scripts/release.sh <asset-ref-sha> \"<message>\"}"
 MSG="${2:-Release}"
-export STUDIO_DB="${STUDIO_DB:-velda_studio_dev.duckdb}"
+export STUDIO_DB="${STUDIO_DB:-velda_studio.duckdb}"
 TRAILER=""
 if [ -n "${RELEASE_TRAILER:-}" ]; then TRAILER=$'\n\n'"$RELEASE_TRAILER"; fi
 commit() { git -c user.name="Claude" -c user.email="noreply@anthropic.com" commit -q -m "$1$TRAILER"; }

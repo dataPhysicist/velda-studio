@@ -28,7 +28,7 @@ Outside Toolbelt the page opens a local preview from `scripts/fixtures/` in memo
 
 ## Databases
 
-`velda_studio.duckdb` holds the live schemes. Builds save to `velda_studio_dev.duckdb`, a test copy, and say "Test copy" in the title row, until the 1.0 release switches the default to the live database (`STUDIO_DB` at build time picks one). A page URL can override either with `?db=<name>.duckdb`. A page refuses to open a database written by a newer schema.
+Release builds save to `velda_studio.duckdb`, the live schemes. A build made with `STUDIO_DB=velda_studio_dev.duckdb` saves to the test copy instead and says "Test copy" in the title row. A page URL can override either with `?db=<name>.duckdb`. A page refuses to open a database written by a newer schema. The v0.3 tables as they were before 1.0 are kept in the live file as `backup_20261026_*`.
 
 ## Deployment
 

@@ -1,5 +1,5 @@
 // Persistence: schemes, versions (each holds a full model), messages, comments, saved themes.
-// Inside Toolbelt this is workspace DuckDB (velda_studio_dev.duckdb until 1.0); outside it, memory (local dev).
+// Inside Toolbelt this is workspace DuckDB (velda_studio.duckdb, or the test copy for a dev build); outside it, memory (local dev).
 
 import type { StudioModel } from './lib/model'
 import type { Theme } from './lib/theme'

@@ -175,9 +175,9 @@ export class ToolbeltSDK {
 
 declare const __STUDIO_DB__: string
 
-/** N8's real schemes. Only the 1.0 release points here; until then builds use the test copy. */
+/** N8's real schemes, where release builds save since 1.0. */
 export const LIVE_DB = 'velda_studio.duckdb'
-/** Test copy used by development releases, so the build never touches the real schemes. */
+/** The test copy, for a build made with STUDIO_DB=velda_studio_dev.duckdb (and the fallback when a build names none). */
 export const DEV_DB = 'velda_studio_dev.duckdb'
 
 /** The workspace database this page uses: `?db=<name>.duckdb` on the page URL wins, else the build's default. */

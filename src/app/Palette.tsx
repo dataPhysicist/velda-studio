@@ -7,6 +7,8 @@ import { finishFor, ROLES } from '../lib/theme'
 import { redo, undo, useEditor, handEdit } from './editor'
 import { enterWalk, exitWalk, focusOn, openScheme, send, setPrefs, useStudio } from './store'
 
+declare const __STUDIO_VERSION__: string
+
 export type DialogName = 'share' | 'export' | 'settings' | 'shortcuts' | 'palette'
 export const useDialogs = create<{ open: DialogName | null }>(() => ({ open: null }))
 export const openDialog = (open: DialogName | null) => useDialogs.setState({ open })
@@ -273,7 +275,7 @@ export function Settings() {
             </button>
           </p>
           <p className="muted small">
-            Build {build}
+            Velda Studio {typeof __STUDIO_VERSION__ === 'string' ? __STUDIO_VERSION__ : ''}, build {build}
             {sdk ? '' : ', not connected to Toolbelt (local preview)'}.
           </p>
         </section>
