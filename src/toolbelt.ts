@@ -44,6 +44,11 @@ export class ToolbeltSDK {
     return this.context
   }
 
+  /** True on the page's public URL for a visitor who is not signed in to Toolbelt. */
+  get isPublic(): boolean {
+    return this.context?.authenticated === false
+  }
+
   /** Resolve a bare tool name (e.g. "create_sub_chat") to the exact name the bridge exposes. */
   async toolName(bare: string): Promise<string> {
     if (!this.tools) {
@@ -128,6 +133,14 @@ export class ToolbeltSDK {
 
   /** Ask Claude through a Velda sub-chat and wait for the answer text. */
   async ask(content: string, model: string, timeoutSeconds = 120): Promise<string> {
+    // Public visitors: Toolbelt does not offer create_sub_chat on public pages, so use public chat,
+    // which answers in-line with the page's allowlisted tools.
+    if (this.isPublic) {
+      const res = await this.sendRequest('TOOLBELT_CHAT', { message: content })
+      const text = typeof res === 'string' ? res : res?.content ?? res?.text
+      if (typeof text === 'string' && text.trim()) return text
+      throw new Error('Velda did not answer')
+    }
     const r = await this.runToolParsed('create_sub_chat', {
       content,
       targetAssistantId: this.workspaceId || undefined,
