@@ -499,3 +499,48 @@ Decisions N8 needs: none.
 - 1.0.1 released (build 2880057, check green inside the script: 151 unit, 2 timing, 17 browser tests in 25.1 min). The fallback in `apps/velda-studio/index.html` moved to 2880057. In the page it loads 2880057 on the live database, with the As-built marked as the as-built.
 
 Next: whatever N8 finds using it.
+
+## 2026-11-17  Rooms (the photo-first page)  branch `rooms`, commits 1e4ae57 to the release below
+
+Why: N8's wife works by taking a photo of a room and asking AI to change it. Small changes kept "messing up" the rest of the picture, nothing knew the room's real size, and nobody raised what a designer or architect would. Decision: not more panels in the Studio (a desktop plan editor, 3D and all), and not a separate product either. Rooms is a second, light page in this repo on the same database: the Studio stays the place for the floor plan, Rooms is the place for photos, and both read the same rooms, sizes, style directions and plan checks.
+
+Done:
+- `src/rooms/`: `photo/compose.ts` (what changed between the photo and the model's picture, and laying only that back in), `photo/canvas.ts`, `ai.ts` (the request to the image model with the room's facts from the plan; Velda's look at a photo; questions), `review.ts` (46 designer's notes by kind of room, raised by what is asked for), `house.ts` (rooms, facts, style, plan checks and planned changes from the Studio's model), `db.ts` (tables `rp_photos`, `rp_versions`, `rp_saved` in the Studio's database; the Studio never reads them), `backend.ts`, `store.ts`, `ui/`.
+- A change in words: the whole photo goes to the image model; the page lines the result up with the photo, matches its tones, finds the areas that really changed, keeps the main change (and anything of similar weight) and puts every other pixel back. Areas the model changed without being asked show as "Put back" and can be kept with a tap; "Only change what I asked for" can be turned off for a whole new look.
+- Mark a spot: paint over a part; only that part of the picture (with room around it, enlarged) goes to the model and comes back through the brush. Nothing outside the brush can change.
+- Every kept change is a version; any version can be the start of the next change; hold to compare with the real photo; favorites; download.
+- Ideas: Velda looks at the photo with the room's plan facts, style direction, planned changes and plan checks, and gives six ideas (small to large), each one tap to try, plus what she notices in the photo. Saved designs that change the room can be shown in the photo ("See ... in this photo").
+- The designer's eye: plan checks for the room (the house as it is, then each saved design), what Velda noticed in the photo, notes raised by what was asked for (they appear while typing), standing notes for the kind of room, each with who to ask. Any can be saved to a questions list (copy, print, tick off). "Ask Velda about this room" answers with the photo and the plan.
+- Page: Toolbelt page "Rooms" (slug `velda-rooms`, private), loader `apps/velda-rooms/index.html` (a copy of `toolbelt/rooms.html`), which reads `rooms-release.json` from main, then from the `rooms` branch, then its fallback commit; `?build=<commit>` opens one exact build. `scripts/release-rooms.sh` checks, builds, pushes and moves the pointer. Bundle: `dist/rooms.js` 400 KB (132 KB compressed), no 3D code.
+
+Platform findings (signed preview of the page in the built-in browser on N8's Mac, 2026-11-17):
+- The page can run Replicate models itself through the bridge (`Replicate_replicate-create-prediction`, `...get-prediction`): a change took 26 s end to end, 24 s of it the model, against about a minute through a Velda sub-chat. The relay stays as the fallback and also worked (40 s for a marked spot).
+- A signed preview reports `authenticated: false`. `sdk.ask` took that for a public visitor and used page chat, which refuses to start there ("would load 227 tools, which exceeds the maximum of 128"). `ask` now uses a sub-chat whenever the sub-chat tool is offered.
+- In a sub-chat, `read_storage_file` on a JPEG gave the model a link and an artifact path, not the picture ("The tool returned a resource_link instead of image pixels"), so Velda could not see photos that way. Rooms shows her the photo by running a vision model itself with the photo attached.
+- Replicate on 2026-11-17: `google/nano-banana-2` and `-2.1` failed every call ("RefreshError: invalid_grant: Invalid JWT Signature") and `anthropic/claude-opus-5.5` failed with "401 invalid x-api-key"; both are Replicate's own connections to those providers. `black-forest-labs/flux-2-pro` (the image model Rooms tries first) and `google/gemini-3-flash` (vision) worked. Rooms tries FLUX.2 pro then Nano Banana 2 for pictures, and Claude Opus 5.5 then Gemini 3 Flash for looking at a photo.
+- Two bridge calls arriving together sometimes fail with "Failed to execute public tool" (-32603); model runs now go one at a time and a dropped start is tried once more.
+
+Evidence:
+- Real edit, measured outside the page first: the primary bath render (`velda-studio/renders/r9ekia9hcv.jpg`), "paint the wooden vanity cabinet a deep navy blue", FLUX.2 pro. The model's picture differed from the photo in 99.9 percent of its pixels (tones, floor veining, sconce glow, brass pulls where black were). After Rooms' pass, 95 percent of the picture is the photo byte for byte and the vanity is navy.
+- In the Toolbelt page on the test copy (`velda_studio_dev.duckdb`): rooms read from the plans (16 rooms of the A2 as-built); a photo added to the Primary Bathroom in 2.9 s; the same request: one area kept (the vanity), four put back, 26 s; a marked spot on the left window through the relay path, 40 s; Velda's look with the photo attached: 31 s (Gemini, after Claude's refusal), with photo-specific notes (the floor register where a wider vanity would go, sconces not centered on the sinks, the outlet beside the sink, no mirrors yet).
+- `npx vitest run tests/rooms`: 21 tests (change detection on drifted pictures, side effects, two like changes, a nudged object against a repainted one, the marked-spot crop and paste, working sizes, the notes and prompts). `tests/e2e/rooms.spec.ts`: the whole flow in the local preview at desktop and phone size with stand-ins for the model and Velda (screenshots `docs/buildlog/rooms-1-home.jpg`, `rooms-2-review.jpg`, `rooms-3-phone.jpg`). `tsc` clean.
+
+Open:
+- Not run: the full Studio check (`npm run check`); the Studio's source is unchanged except the `ask` fix in `src/toolbelt.ts`, and `dist/studio.js` is not rebuilt on this branch, so the live Studio is as it was. Merge to main with `scripts/release.sh` when N8 says so.
+- Not checked: a real phone (camera capture, an iPhone HEIC file), the signed-in in-app page (only the signed preview), a public page for a second person, Nano Banana as the image model (down today), costs (FLUX.2 pro and the vision model are billed by Replicate; no figures were read).
+- The marked-spot result on the window was not looked at closely; the "moved object" test reaches about 12 pixels, so a model that shifts something further shows it as a changed area to put back by hand.
+- Photos and versions are stored at about 2 megapixels (for example 1200 x 1600); the original file is not kept.
+
+Decisions N8 needs: how his wife opens it (her own Toolbelt sign-in, or publishing the page for her); merging the branch.
+
+Next: on N8's word, publish or share; then whatever she finds using it.
+
+## 2026-11-17  Rooms published  build accf8ae
+
+- N8: "Publish the page. It's fine if others can edit it." And: it only needs to work with the Velda Dairy property. The page is public at https://velda-rooms.tryapexti.ai (public settings: run tools, SQL with writes on `velda_studio.duckdb` only; tools allowed: `upload_file_to_storage`, `read_storage_file`, `get_storage_file_url`, `Replicate_replicate-create-prediction`, `Replicate_replicate-get-prediction`, `Replicate_replicate-get-model`).
+- Found on the published page and fixed in accf8ae: a change asked for while Velda was still looking at a new photo failed ("Failed to execute public tool"); the bridge fails a tool call when another is in flight. Every tool call the page makes now goes through one lane, one at a time, and a failed call is tried again twice.
+- Checked from the public link in the built-in browser on N8's Mac: the real plans load (30 rooms, 4 designs); a photo added in 0.9 s; Velda's look 33 s; "paint the wooden vanity cabinet a deep navy blue" while she was looking: 48 s, 2 areas kept of 9 found. The test photo was removed afterward (one row in `rp_photos`, marked deleted).
+- The short link's certificate was not ready for the first minute after publishing; it loaded on the second try.
+- One run of `tests/e2e/rooms.spec.ts` inside the release script reported "1 passed" (the other test did not pass that time); the next two runs passed both. Not chased down.
+
+Open: a real phone; costs; the pull request is not merged, so the page still loads from the `rooms` branch.

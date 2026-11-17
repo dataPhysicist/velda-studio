@@ -134,8 +134,10 @@ export class ToolbeltSDK {
   /** Ask Claude through a Velda sub-chat and wait for the answer text. */
   async ask(content: string, model: string, timeoutSeconds = 120): Promise<string> {
     // Public visitors: Toolbelt does not offer create_sub_chat on public pages, so use public chat,
-    // which answers in-line with the page's allowlisted tools.
-    if (this.isPublic) {
+    // which answers in-line with the page's allowlisted tools. A signed preview also reports itself
+    // as not signed in, but it has every tool (and its chat refuses to start with that many), so go
+    // by whether the sub-chat tool is there.
+    if (this.isPublic && !(await this.listToolNames()).some((n) => /(^|_)create_sub_chat$/.test(n))) {
       const res = await this.sendRequest('TOOLBELT_CHAT', { message: content })
       const text = typeof res === 'string' ? res : res?.content ?? res?.text
       if (typeof text === 'string' && text.trim()) return text
