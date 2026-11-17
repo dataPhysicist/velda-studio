@@ -17,7 +17,8 @@ export interface Backend {
   getImage(path: string): Promise<string | null>
   /** A link an image model can fetch. */
   link(path: string): Promise<string>
-  ask(prompt: string, deep: boolean): Promise<string>
+  /** Ask Velda. With `image` (a stored picture) she looks at it. */
+  ask(prompt: string, deep: boolean, image?: string | null): Promise<string>
   runModel(model: string, version: string, input: Record<string, unknown>): Promise<ModelRun>
 }
 
@@ -49,16 +50,40 @@ export class ToolbeltBackend implements Backend {
   link(path: string) {
     return /^https?:/.test(path) ? Promise.resolve(path) : this.sdk.signedUrl(path, 3600)
   }
-  ask(prompt: string, deep: boolean) {
-    return this.sdk.ask(prompt, deep ? DEEP_MODEL : FAST_MODEL, deep ? 150 : 90)
+  /**
+   * Velda's answers come from Claude run as a model the page calls itself, because that is the one
+   * way she can be shown a picture (a sub-chat's file tool hands the model a link, not the pixels),
+   * and it is quicker. If the page may not run models, a sub-chat answers without seeing the photo.
+   */
+  async ask(prompt: string, deep: boolean, image?: string | null) {
+    if (this.direct !== false) {
+      try {
+        const input: Record<string, unknown> = { prompt, effort: deep ? 'medium' : 'low', max_tokens: 8192 }
+        if (image) {
+          input.image = await this.link(image)
+          input.max_image_resolution = 1.5
+        }
+        const p = await this.runDirect(SEER.model, SEER.version, input)
+        this.direct = true
+        const text = Array.isArray(p.output) ? p.output.join('') : String(p.output ?? '')
+        if (text.trim()) return text
+      } catch (e) {
+        console.warn('[rooms] Velda could not answer as a model run; asking through a sub-chat', e)
+        if (!(e instanceof ModelFailed)) this.direct = false
+      }
+    }
+    const blind = image ? `${prompt}\n\n(The photo could not be attached this time. Answer from the floor plan facts alone, and say in your first sentence that you could not see the photo.)` : prompt
+    return this.sdk.ask(blind, deep ? DEEP_MODEL : FAST_MODEL, deep ? 120 : 90)
   }
   async runModel(model: string, version: string, input: Record<string, unknown>): Promise<ModelRun> {
     const t0 = Date.now()
     if (this.direct !== false) {
       try {
-        const run = await this.runDirect(model, version, input)
+        const p = await this.runDirect(model, version, input)
         this.direct = true
-        return { ...run, seconds: (Date.now() - t0) / 1000, via: 'direct' }
+        const url = outputUrls(p.output)[0]
+        if (!url) throw new ModelFailed('no picture came back')
+        return { url, id: p.id, seconds: (Date.now() - t0) / 1000, via: 'direct' }
       } catch (e) {
         // A model that ran and failed is a real answer; only a bridge that will not run the tool sends us to Velda.
         if (e instanceof ModelFailed) throw e
@@ -83,12 +108,13 @@ export class ToolbeltBackend implements Backend {
       await wait(1400)
       p = unwrap(await this.sdk.runToolParsed('replicate-get-prediction', { predictionId: id })) ?? p
     }
-    if (p.status !== 'succeeded') throw new ModelFailed(String(p.error || `the image model ${p.status}`))
-    const url = outputUrls(p.output)[0]
-    if (!url) throw new ModelFailed('no picture came back')
-    return { url, id }
+    if (p.status !== 'succeeded') throw new ModelFailed(String(p.error || `the model ${p.status}`))
+    return p as { id: string; output: unknown }
   }
 }
+
+/** Claude as a model the page can run with a picture attached (checked 2026-11-17: prompt, image, effort, max_tokens). */
+const SEER = { model: 'anthropic/claude-opus-5.5', version: '9382e88533ac3d3b2e714c0cb634c75779ce84c9ab861cc6fc6d6b559ea36eca' }
 
 /** The image model ran and said no (as opposed to the bridge refusing to run it). */
 export class ModelFailed extends Error {}

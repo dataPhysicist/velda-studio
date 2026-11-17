@@ -168,7 +168,7 @@ export type StudyInput = { path: string; room: string; facts: string; style: str
 export function studyPrompt(s: StudyInput): string {
   return `You are Velda, an architect and interior designer who specializes in remodels. A homeowner took a photo of a room in her house and wants ideas, and wants to hear what a designer or architect would notice that she and her husband may not have thought of.
 
-Open the photo with your read_storage_file tool: "${s.path}". Look at it carefully before answering.
+Her photo of the room is attached. Look at it carefully before answering.
 
 What the measured floor plan says about this room:
 ${s.facts || '(nothing on file)'}
@@ -202,7 +202,7 @@ export function parseStudy(raw: string): Study | null {
 }
 
 export async function study(be: Backend, s: StudyInput): Promise<Study> {
-  const raw = await be.ask(studyPrompt(s), true)
+  const raw = await be.ask(studyPrompt(s), true, s.path)
   const out = parseStudy(raw)
   if (!out) throw new Error('Velda looked but did not send ideas back')
   return out
@@ -210,7 +210,7 @@ export async function study(be: Backend, s: StudyInput): Promise<Study> {
 
 export function askPrompt(q: string, s: Omit<StudyInput, 'asked'> & { path: string | null }): string {
   return `You are Velda, an architect and interior designer who specializes in remodels, answering a homeowner's question about a room in her house.
-${s.path ? `\nOpen her photo of the room with your read_storage_file tool: "${s.path}".\n` : ''}
+${s.path ? '\nHer photo of the room is attached.\n' : ''}
 What the measured floor plan says about this room:
 ${s.facts || '(nothing on file)'}
 ${s.style ? `\nThe style direction on file:\n${s.style}\n` : ''}${s.planned.length ? `\nChanges drawn in their saved designs:\n${s.planned.map((l) => `- ${l}`).join('\n')}\n` : ''}${s.findings.length ? `\nWhat the plan checker flags:\n${s.findings.map((l) => `- ${l}`).join('\n')}\n` : ''}
@@ -221,7 +221,7 @@ Plain words, feet and inches, no em dashes. Never present a guess as a measureme
 }
 
 export async function ask(be: Backend, q: string, s: Omit<StudyInput, 'asked'> & { path: string | null }): Promise<{ answer: string; ask: string }> {
-  const raw = await be.ask(askPrompt(q, s), true)
+  const raw = await be.ask(askPrompt(q, s), true, s.path)
   const o = firstJson(raw)
   const answer = clean(o?.answer ?? raw, 900)
   if (!answer) throw new Error('Velda did not answer')

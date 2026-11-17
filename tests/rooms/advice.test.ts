@@ -74,8 +74,7 @@ describe('asking for a change', () => {
 describe("Velda's look at a photo", () => {
   it('asks for ideas and notices with the plan facts, and reads the answer even with inch marks and a code fence', () => {
     const prompt = studyPrompt({ path: 'velda-rooms/p1/v1.jpg', room: 'Primary Bathroom', facts: 'about 125 square feet', style: '', planned: ['N8 bath: the tub becomes a shower'], findings: [], asked: [] })
-    expect(prompt).toContain('read_storage_file')
-    expect(prompt).toContain('velda-rooms/p1/v1.jpg')
+    expect(prompt).toContain('photo of the room is attached')
     expect(prompt).toContain('about 125 square feet')
     expect(prompt).toContain('the tub becomes a shower')
     const s = parseStudy('```json\n{"sees": "A bath with a 6\'-0" vanity.", "ideas": [{"title": "Navy vanity", "why": "Grounds the room — nicely.", "prompt": "Paint the vanity navy.", "scale": "tweak"}, {"title": "", "prompt": ""}], "notices": [{"title": "Register under the vanity", "body": "The floor register sits where a wider vanity would go.", "ask": "Contractor"}]}\n```')!
