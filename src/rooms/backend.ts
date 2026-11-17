@@ -37,6 +37,7 @@ export class ToolbeltBackend implements Backend {
   db = DB
   /** Whether the page may call the image model itself (fast), or has to ask Velda to (slower). Unknown until tried. */
   private direct: boolean | null = null
+  private dead = new Set<string>()
   constructor(readonly sdk: ToolbeltSDK) {}
   sql(query: string) {
     return this.sdk.sql(query, this.db)
@@ -57,19 +58,23 @@ export class ToolbeltBackend implements Backend {
    */
   async ask(prompt: string, deep: boolean, image?: string | null) {
     if (this.direct !== false) {
-      try {
-        const input: Record<string, unknown> = { prompt, effort: deep ? 'medium' : 'low', max_tokens: 8192 }
-        if (image) {
-          input.image = await this.link(image)
-          input.max_image_resolution = 1.5
+      const link = image ? await this.link(image) : null
+      for (const seer of SEERS) {
+        if (this.dead.has(seer.model)) continue
+        try {
+          const p = await this.runDirect(seer.model, seer.version, seer.input(prompt, link, deep))
+          this.direct = true
+          const text = Array.isArray(p.output) ? p.output.join('') : String(p.output ?? '')
+          if (text.trim()) return text
+        } catch (e) {
+          console.warn(`[rooms] ${seer.model} did not answer`, e)
+          // A model whose own service is refusing it stays out for this visit; the next one is tried.
+          if (e instanceof ModelFailed) this.dead.add(seer.model)
+          else {
+            this.noteBridge(e)
+            break
+          }
         }
-        const p = await this.runDirect(SEER.model, SEER.version, input)
-        this.direct = true
-        const text = Array.isArray(p.output) ? p.output.join('') : String(p.output ?? '')
-        if (text.trim()) return text
-      } catch (e) {
-        console.warn('[rooms] Velda could not answer as a model run; asking through a sub-chat', e)
-        if (!(e instanceof ModelFailed)) this.direct = false
       }
     }
     const blind = image ? `${prompt}\n\n(The photo could not be attached this time. Answer from the floor plan facts alone, and say in your first sentence that you could not see the photo.)` : prompt
@@ -88,7 +93,7 @@ export class ToolbeltBackend implements Backend {
         // A model that ran and failed is a real answer; only a bridge that will not run the tool sends us to Velda.
         if (e instanceof ModelFailed) throw e
         console.warn('[rooms] the page could not run the image model itself; asking Velda to', e)
-        this.direct = false
+        this.noteBridge(e)
       }
     }
     const res = await runReplicate(this.sdk, model, input, { timeoutSeconds: 240 })
@@ -96,9 +101,31 @@ export class ToolbeltBackend implements Backend {
     if (!url) throw new Error('no picture came back')
     return { url, seconds: (Date.now() - t0) / 1000, id: res.id, via: 'velda' }
   }
+  /** The bridge refusing a tool outright (not allowed, not found) is lasting; anything else is a hiccup and the next call tries again. */
+  private noteBridge(e: unknown) {
+    const err = e as { code?: string; status?: number }
+    if (this.direct !== true && (err?.code === 'TOOL_NOT_FOUND' || err?.status === 403 || err?.status === 404)) this.direct = false
+  }
+  /** One model run at a time, each start tried twice: the bridge drops a call now and then when two arrive together. */
+  private lane: Promise<unknown> = Promise.resolve()
+  private start(args: Record<string, unknown>) {
+    const go = async () => {
+      try {
+        return await this.sdk.runToolParsed('replicate-create-prediction', args)
+      } catch (e) {
+        const err = e as { code?: string; status?: number }
+        if (err?.code === 'TOOL_NOT_FOUND' || err?.status === 403 || err?.status === 404) throw e
+        await wait(1200)
+        return this.sdk.runToolParsed('replicate-create-prediction', args)
+      }
+    }
+    const p = this.lane.then(go, go)
+    this.lane = p.catch(() => undefined)
+    return p
+  }
   private async runDirect(model: string, version: string, input: Record<string, unknown>) {
     const owner = model.split('/')[0]
-    const made = unwrap(await this.sdk.runToolParsed('replicate-create-prediction', { collectionSlug: owner, modelId: model, version, input: JSON.stringify(input) }))
+    const made = unwrap(await this.start({ collectionSlug: owner, modelId: model, version, input: JSON.stringify(input) }))
     const id = made?.id
     if (!id) throw new Error(`the image model did not start (${JSON.stringify(made).slice(0, 200)})`)
     let p = made
@@ -106,15 +133,29 @@ export class ToolbeltBackend implements Backend {
     while (!['succeeded', 'failed', 'canceled'].includes(p?.status)) {
       if (Date.now() > until) throw new ModelFailed('the picture took too long')
       await wait(1400)
-      p = unwrap(await this.sdk.runToolParsed('replicate-get-prediction', { predictionId: id })) ?? p
+      p = unwrap(await this.sdk.runToolParsed('replicate-get-prediction', { predictionId: id }).catch(() => null)) ?? p
     }
     if (p.status !== 'succeeded') throw new ModelFailed(String(p.error || `the model ${p.status}`))
     return p as { id: string; output: unknown }
   }
 }
 
-/** Claude as a model the page can run with a picture attached (checked 2026-11-17: prompt, image, effort, max_tokens). */
-const SEER = { model: 'anthropic/claude-opus-5.5', version: '9382e88533ac3d3b2e714c0cb634c75779ce84c9ab861cc6fc6d6b559ea36eca' }
+/**
+ * Models that can be shown a picture, run by the page itself, in the order they are tried (inputs
+ * checked 2026-11-17). Claude first; Gemini when Claude's service on Replicate is refusing calls.
+ */
+const SEERS = [
+  {
+    model: 'anthropic/claude-opus-5.5',
+    version: '9382e88533ac3d3b2e714c0cb634c75779ce84c9ab861cc6fc6d6b559ea36eca',
+    input: (prompt: string, image: string | null, deep: boolean) => ({ prompt, effort: deep ? 'medium' : 'low', max_tokens: 8192, ...(image ? { image, max_image_resolution: 1.5 } : {}) }),
+  },
+  {
+    model: 'google/gemini-3-flash',
+    version: '61ebd56fbf92e15093c9abae6e4437e5c06260bd64f839e784f68d9d7f3e95b0',
+    input: (prompt: string, image: string | null) => ({ prompt, max_output_tokens: 8192, ...(image ? { images: [image] } : {}) }),
+  },
+]
 
 /** The image model ran and said no (as opposed to the bridge refusing to run it). */
 export class ModelFailed extends Error {}
