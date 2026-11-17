@@ -43,13 +43,14 @@ export class ToolbeltBackend implements Backend {
     return this.sdk.sql(query, this.db)
   }
   async putImage(path: string, blob: Blob) {
-    await this.sdk.upload(path, await toB64(blob), blob.type || 'image/jpeg')
+    const b64 = await toB64(blob)
+    await this.one(() => this.sdk.upload(path, b64, blob.type || 'image/jpeg'))
   }
   getImage(path: string) {
-    return this.sdk.readImage(path)
+    return this.one(() => this.sdk.readImage(path))
   }
   link(path: string) {
-    return /^https?:/.test(path) ? Promise.resolve(path) : this.sdk.signedUrl(path, 3600)
+    return /^https?:/.test(path) ? Promise.resolve(path) : this.one(() => this.sdk.signedUrl(path, 3600))
   }
   /**
    * Velda's answers come from Claude run as a model the page calls itself, because that is the one
@@ -106,26 +107,37 @@ export class ToolbeltBackend implements Backend {
     const err = e as { code?: string; status?: number }
     if (this.direct !== true && (err?.code === 'TOOL_NOT_FOUND' || err?.status === 403 || err?.status === 404)) this.direct = false
   }
-  /** One model run at a time, each start tried twice: the bridge drops a call now and then when two arrive together. */
+  /**
+   * Every tool call this page makes goes through one lane, one at a time: the bridge fails a call
+   * ("Failed to execute public tool") when another is still in flight, which happened whenever Velda
+   * was looking at a photo while a change was being made. A failed call is tried again twice.
+   */
   private lane: Promise<unknown> = Promise.resolve()
-  private start(args: Record<string, unknown>) {
+  private one<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
     const go = async () => {
-      try {
-        return await this.sdk.runToolParsed('replicate-create-prediction', args)
-      } catch (e) {
-        const err = e as { code?: string; status?: number }
-        if (err?.code === 'TOOL_NOT_FOUND' || err?.status === 403 || err?.status === 404) throw e
-        await wait(1200)
-        return this.sdk.runToolParsed('replicate-create-prediction', args)
+      let last: unknown
+      for (let i = 0; i < tries; i++) {
+        try {
+          return await fn()
+        } catch (e) {
+          last = e
+          const err = e as { code?: string; status?: number }
+          if (err?.code === 'TOOL_NOT_FOUND' || err?.status === 403 || err?.status === 404) break
+          await wait(700 * (i + 1))
+        }
       }
+      throw last
     }
     const p = this.lane.then(go, go)
     this.lane = p.catch(() => undefined)
     return p
   }
+  private tool(name: string, args: Record<string, unknown>) {
+    return this.one(() => this.sdk.runToolParsed(name, args))
+  }
   private async runDirect(model: string, version: string, input: Record<string, unknown>) {
     const owner = model.split('/')[0]
-    const made = unwrap(await this.start({ collectionSlug: owner, modelId: model, version, input: JSON.stringify(input) }))
+    const made = unwrap(await this.tool('replicate-create-prediction', { collectionSlug: owner, modelId: model, version, input: JSON.stringify(input) }))
     const id = made?.id
     if (!id) throw new Error(`the image model did not start (${JSON.stringify(made).slice(0, 200)})`)
     let p = made
@@ -133,7 +145,7 @@ export class ToolbeltBackend implements Backend {
     while (!['succeeded', 'failed', 'canceled'].includes(p?.status)) {
       if (Date.now() > until) throw new ModelFailed('the picture took too long')
       await wait(1400)
-      p = unwrap(await this.sdk.runToolParsed('replicate-get-prediction', { predictionId: id }).catch(() => null)) ?? p
+      p = unwrap(await this.tool('replicate-get-prediction', { predictionId: id }).catch(() => null)) ?? p
     }
     if (p.status !== 'succeeded') throw new ModelFailed(String(p.error || `the model ${p.status}`))
     return p as { id: string; output: unknown }
