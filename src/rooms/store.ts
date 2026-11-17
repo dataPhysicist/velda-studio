@@ -92,7 +92,7 @@ export function roomInfo(id: string | null): RoomInfo | null {
 
 function toast(text: string) {
   set({ toast: text })
-  setTimeout(() => get().toast === text && set({ toast: null }), 6000)
+  setTimeout(() => get().toast === text && set({ toast: null }), 12000)
 }
 
 function fail(what: string, e: unknown) {

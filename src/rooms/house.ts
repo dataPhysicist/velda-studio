@@ -263,7 +263,7 @@ export async function loadHouse(be: Backend): Promise<House> {
   house.plans = []
   void (async () => {
     for (const s of schemes) {
-      if (s.id === asb.id || !s.head_version) continue
+      if (s.id === asb.id || !s.head_version || s.role === 'asbuilt' || /^as-built/i.test(s.name)) continue
       try {
         const m = await head(s)
         if (m) house.plans.push({ id: s.id, name: s.name, model: m })

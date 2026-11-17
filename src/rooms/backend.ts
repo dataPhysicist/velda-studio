@@ -54,7 +54,7 @@ export class ToolbeltBackend implements Backend {
   }
   async runModel(model: string, version: string, input: Record<string, unknown>): Promise<ModelRun> {
     const t0 = Date.now()
-    if (this.direct !== false && !this.sdk.isPublic) {
+    if (this.direct !== false) {
       try {
         const run = await this.runDirect(model, version, input)
         this.direct = true

@@ -39,7 +39,11 @@
       .then(function (j) { return j && /^[0-9a-f]{40}$/.test(j.sha) ? j.sha : null })
       .catch(function () { return null })
   }
-  read('main').then(function (sha) { return sha || read('rooms') }).then(function (sha) { go(sha || FALLBACK) })
+  // ?build=<commit> opens one exact build (for checking a build before the pointer moves to it).
+  var pick = null
+  try { pick = new URLSearchParams(location.search).get('build') } catch (e) {}
+  if (pick && /^[0-9a-f]{40}$/.test(pick)) go(pick)
+  else read('main').then(function (sha) { return sha || read('rooms') }).then(function (sha) { go(sha || FALLBACK) })
 })()
 </script>
 </body>
