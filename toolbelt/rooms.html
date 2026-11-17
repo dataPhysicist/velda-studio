@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rooms</title>
+<!-- Toolbelt app page for Rooms (the photo-first page). The code is built from
+     github.com/dataPhysicist/velda-studio and served by jsDelivr, pinned to a commit. The page reads
+     rooms-release.json from GitHub for the current commit (main first, then the rooms branch); if
+     GitHub cannot be reached it uses the FALLBACK commit below. -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif&display=swap">
+<style>html,body,#root{margin:0;min-height:100%;background:#e9eae4}</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+(function () {
+  var FALLBACK = '1e4ae570f14f2db207158b20a65267541d941a99'
+  var REPO = 'dataPhysicist/velda-studio'
+  function load(sha) {
+    var base = 'https://cdn.jsdelivr.net/gh/' + REPO + '@' + sha + '/dist/'
+    var css = document.createElement('link')
+    css.rel = 'stylesheet'
+    css.href = base + 'rooms.css'
+    document.head.appendChild(css)
+    var js = document.createElement('script')
+    js.type = 'module'
+    js.src = base + 'rooms.js'
+    document.body.appendChild(js)
+  }
+  var done = false
+  function go(sha) { if (!done) { done = true; clearTimeout(timer); load(sha) } }
+  var timer = setTimeout(function () { go(FALLBACK) }, 3000)
+  function read(branch) {
+    return fetch('https://raw.githubusercontent.com/' + REPO + '/' + branch + '/rooms-release.json', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null })
+      .then(function (j) { return j && /^[0-9a-f]{40}$/.test(j.sha) ? j.sha : null })
+      .catch(function () { return null })
+  }
+  read('main').then(function (sha) { return sha || read('rooms') }).then(function (sha) { go(sha || FALLBACK) })
+})()
+</script>
+</body>
+</html>
