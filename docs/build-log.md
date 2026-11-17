@@ -534,3 +534,13 @@ Open:
 Decisions N8 needs: how his wife opens it (her own Toolbelt sign-in, or publishing the page for her); merging the branch.
 
 Next: on N8's word, publish or share; then whatever she finds using it.
+
+## 2026-11-17  Rooms published  build accf8ae
+
+- N8: "Publish the page. It's fine if others can edit it." And: it only needs to work with the Velda Dairy property. The page is public at https://velda-rooms.tryapexti.ai (public settings: run tools, SQL with writes on `velda_studio.duckdb` only; tools allowed: `upload_file_to_storage`, `read_storage_file`, `get_storage_file_url`, `Replicate_replicate-create-prediction`, `Replicate_replicate-get-prediction`, `Replicate_replicate-get-model`).
+- Found on the published page and fixed in accf8ae: a change asked for while Velda was still looking at a new photo failed ("Failed to execute public tool"); the bridge fails a tool call when another is in flight. Every tool call the page makes now goes through one lane, one at a time, and a failed call is tried again twice.
+- Checked from the public link in the built-in browser on N8's Mac: the real plans load (30 rooms, 4 designs); a photo added in 0.9 s; Velda's look 33 s; "paint the wooden vanity cabinet a deep navy blue" while she was looking: 48 s, 2 areas kept of 9 found. The test photo was removed afterward (one row in `rp_photos`, marked deleted).
+- The short link's certificate was not ready for the first minute after publishing; it loaded on the second try.
+- One run of `tests/e2e/rooms.spec.ts` inside the release script reported "1 passed" (the other test did not pass that time); the next two runs passed both. Not chased down.
+
+Open: a real phone; costs; the pull request is not merged, so the page still loads from the `rooms` branch.

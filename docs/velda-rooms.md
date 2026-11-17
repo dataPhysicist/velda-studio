@@ -12,7 +12,8 @@ Not more panels in Velda Studio, and not a separate product. A second, light pag
 
 ## Where it is
 
-- Toolbelt page "Rooms" on the Velda assistant, slug `velda-rooms`, private. In Toolbelt: `/workspaces/588111b7-7e4c-4631-8b88-a59998f719eb/home?page=velda-rooms`.
+- Published 2026-11-17 at N8's word: https://velda-rooms.tryapexti.ai. Anyone with the link can add photos, make changes (each one is billed to the Replicate account) and see what is there; N8 accepted that. It works only with the Velda Dairy plans.
+- Toolbelt page "Rooms" on the Velda assistant, slug `velda-rooms`. In Toolbelt: `/workspaces/588111b7-7e4c-4631-8b88-a59998f719eb/home?page=velda-rooms`.
 - Code on branch `rooms`, pull request 1. The page loads the branch build through `rooms-release.json`; the live Studio is untouched.
 - Data: tables `rp_photos`, `rp_versions`, `rp_saved` in `velda_studio.duckdb`; pictures in Velda storage under `velda-rooms/`.
 
@@ -29,17 +30,17 @@ Not more panels in Velda Studio, and not a separate product. A second, light pag
 
 - A real picture, a real change ("paint the wooden vanity cabinet a deep navy blue") in the Toolbelt page on the test copy: one area kept, the rest put back, 26 seconds. A marked spot: 40 seconds through the slower fallback path. Velda's look at the photo: 31 seconds, with notes specific to the photo.
 - 21 unit tests and a browser test of the whole flow at desktop and phone size.
-- The live build opens on the real plans: 21 rooms on two levels and the four saved designs.
+- The live build opens on the real plans: 21 rooms on two levels (30 with closets and small rooms) and the four saved designs.
+- On the published page: a photo added, Velda's look (33 seconds) and the navy vanity change (48 seconds, slower because it ran while Velda was looking) both worked from the public link. The test photo was removed afterward.
 
 ## Not checked yet
 
-- A real phone (camera, an iPhone HEIC file), the signed-in page (only the signed preview), a published page for a second person.
+- A real phone (camera, an iPhone HEIC file) and the signed-in page inside Toolbelt (the signed preview and the published page were checked).
 - Costs per change (Replicate bills them; no figures were read).
 - Nano Banana as the image model and Claude as the model that looks at photos: both were refused by Replicate's own connections on 2026-11-17. FLUX.2 pro and Gemini 3 Flash did the work and are what the page falls to.
 
 ## Open decisions
 
-- How N8's wife opens it: her own Toolbelt sign-in, or publishing the page (it would need the storage, Replicate and database permissions on its public settings).
 - Merging pull request 1 and releasing from main.
 
 The full record, with the platform findings, is the 2026-11-17 entry in `docs/build-log.md` in the repo (the Project's copy of the build log does not have that entry yet).
